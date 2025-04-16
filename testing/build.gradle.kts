@@ -1,14 +1,11 @@
-@Suppress("DSL_SCOPE_VIOLATION") // TODO: Remove once KTIJ-19369 is fixed
 plugins {
-    //alias(libs.plugins.android.library)
-    //alias(libs.plugins.kotlin.android)
-    id("sfelabs.android.library")
-    id("sfelabs.android.library.compose")
-    id("sfelabs.android.hilt")
+    id("convention.android.library")
+    id("convention.android.library.compose")
+    id("convention.android.hilt")
 }
 
 android {
-    namespace = "net.sfelabs.knox.testing"
+    namespace = "net.sfelabs.knox.core.testing"
 }
 
 dependencies {
@@ -22,7 +19,7 @@ dependencies {
     api(libs.junit)
     api(libs.kotlinx.coroutines.test)
 
-    implementation(project(":knox:common"))
+    implementation(project(":knox-core:common"))
     implementation(libs.kotlin.reflect)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

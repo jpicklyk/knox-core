@@ -1,4 +1,4 @@
-package net.sfelabs.core.ui
+package net.sfelabs.knox.core.ui
 
 import org.junit.Test
 

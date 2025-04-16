@@ -19,6 +19,6 @@ class ExampleInstrumentedTest {
     fun useAppContext() {
         // Context of the app under test.
         val appContext = InstrumentationRegistry.getInstrumentation().targetContext
-        assertEquals("net.sfelabs.core.test", appContext.packageName)
+        assertEquals("net.sfelabs.knox.core.test", appContext.packageName)
     }
 }

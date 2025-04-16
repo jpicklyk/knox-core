@@ -3,7 +3,7 @@ package net.sfelabs.knox.core.common.domain
 import android.annotation.SuppressLint
 import android.os.Build
 import net.sfelabs.knox.core.common.UiText
-import net.sfelabs.knox.core.common.domain.usecase.model.ApiResult
+import net.sfelabs.knox.core.domain.usecase.model.ApiResult
 import java.lang.reflect.Method
 
 typealias UnitResource = Resource<Unit>

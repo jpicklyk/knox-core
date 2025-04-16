@@ -3,7 +3,7 @@ plugins {
 }
 
 dependencies {
-    implementation(project(":knox:usecase-executor"))
+    implementation(project(":knox-core:usecase-executor"))
     implementation(libs.kotlin.stdlib)
     implementation(libs.kotlin.reflect)
     implementation(libs.kotlinx.coroutines.core)
@@ -13,7 +13,7 @@ dependencies {
     implementation(libs.ksp.gradlePlugin)
 
     testImplementation(libs.junit)
-    testImplementation(libs.mockk)
+    testImplementation(libs.mockk.core)
     testImplementation(libs.kotlinx.coroutines.test)
 
     //TODO: Remove once all features are migrated to new format

@@ -1,6 +1,6 @@
 plugins {
     alias(libs.plugins.convention.android.feature)
-    alias(libs.plugins.convention.hilt)
+    alias(libs.plugins.convention.android.hilt)
 }
 
 android {
@@ -9,7 +9,7 @@ android {
 }
 
 dependencies {
-    implementation(project(":knox:usecase-executor"))
+    implementation(project(":knox-core:usecase-executor"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)

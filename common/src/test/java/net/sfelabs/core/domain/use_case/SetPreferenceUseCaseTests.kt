@@ -1,9 +1,10 @@
-package net.sfelabs.core.domain.use_case
+package net.sfelabs.knox.core.domain.use_case
 
 import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
-import net.sfelabs.core.domain.repository.PreferencesRepository
+import net.sfelabs.knox.core.common.domain.repository.PreferencesRepository
+import net.sfelabs.knox.core.common.domain.use_case.SetPreferenceUseCase
 import org.junit.Test
 
 class SetPreferenceUseCaseTests {

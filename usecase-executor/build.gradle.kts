@@ -10,6 +10,6 @@ dependencies {
     testImplementation(libs.kotlin.stdlib)
     testImplementation(libs.kotlinx.coroutines.core)
     testImplementation(libs.kotlinx.coroutines.test)
-    testImplementation(libs.mockk)
+    testImplementation(libs.mockk.core)
     testImplementation(libs.mockk.agent)
 }
