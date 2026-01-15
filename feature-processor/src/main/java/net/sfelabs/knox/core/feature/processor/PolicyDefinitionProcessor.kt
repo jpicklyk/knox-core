@@ -135,6 +135,16 @@ class PolicyDefinitionProcessor(
             return null
         }
 
+        // KSP2 returns enum annotation arguments as KSClassDeclaration, not KSType
+        val categoryValue = annotation.arguments
+            .find { it.name?.asString() == "category" }
+            ?.value
+        val category = when (categoryValue) {
+            is KSClassDeclaration -> PolicyCategory.valueOf(categoryValue.simpleName.asString())
+            is KSType -> PolicyCategory.valueOf(categoryValue.declaration.simpleName.asString())
+            else -> return null
+        }
+
         return ProcessedPolicy(
             className = classDeclaration.simpleName.asString(),
             packageName = classDeclaration.packageName.asString(),
@@ -144,11 +154,7 @@ class PolicyDefinitionProcessor(
             description = annotation.arguments
                 .find { it.name?.asString() == "description" }
                 ?.value as? String ?: return null,
-            category = (annotation.arguments
-                .find { it.name?.asString() == "category" }
-                ?.value as? KSType)?.let {
-                PolicyCategory.valueOf(it.declaration.simpleName.asString())
-            } ?: return null,
+            category = category,
             valueType = valueType,
             configType = configType,
             declaration = classDeclaration
