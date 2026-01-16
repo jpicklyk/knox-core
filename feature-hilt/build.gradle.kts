@@ -1,7 +1,6 @@
 plugins {
     alias(libs.plugins.convention.android.feature)
     alias(libs.plugins.convention.android.hilt)
-    alias(libs.plugins.kotlin.android)
 }
 
 android {

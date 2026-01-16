@@ -29,5 +29,6 @@ dependencies {
     //implementation(libs.androidx.compose.ui.tooling.preview)
 
 
+    testImplementation(libs.junit)
     androidTestImplementation(project(":knox-core:testing"))
 }
