@@ -26,6 +26,7 @@ dependencies {
     //kapt("com.google.dagger:hilt-compiler")
     androidTestImplementation(project(":knox-core:testing"))
     androidTestImplementation(project(":knox-core:usecase-executor"))
+    testImplementation(libs.junit)
     testImplementation(libs.kotlin.stdlib)
     testImplementation(libs.kotlinx.coroutines.core)
     testImplementation(libs.kotlinx.coroutines.test)
