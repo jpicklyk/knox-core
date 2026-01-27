@@ -11,14 +11,18 @@ import org.junit.runner.Description
 import org.junit.runners.model.Statement
 
 @Retention(AnnotationRetention.RUNTIME)
-@Target(AnnotationTarget.FUNCTION)
+@Target(AnnotationTarget.FUNCTION, AnnotationTarget.CLASS)
 annotation class EthernetRequired
 
 class EthernetRequiredRule : TestRule {
     override fun apply(statement: Statement, description: Description): Statement {
         return object : Statement() {
             override fun evaluate() {
-                if (description.getAnnotation(EthernetRequired::class.java) != null) {
+                // Check if annotation is present on either the test method or test class
+                val hasAnnotation = description.getAnnotation(EthernetRequired::class.java) != null ||
+                    description.testClass?.getAnnotation(EthernetRequired::class.java) != null
+
+                if (hasAnnotation) {
                     Assume.assumeTrue("Ethernet connection is not available", isEthernetConnected())
                 }
                 statement.evaluate()
