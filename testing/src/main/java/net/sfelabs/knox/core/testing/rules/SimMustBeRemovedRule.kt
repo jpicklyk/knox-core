@@ -36,31 +36,23 @@ class SimMustBeRemovedRule : TestRule {
     private fun isSimCardPresent(context: Context = ApplicationProvider.getApplicationContext()): Boolean {
         val telephonyManager = context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
 
-        // For Android 5.1+ (API 22+), check all SIM slots using SubscriptionManager
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP_MR1) {
-            try {
-                val subscriptionManager = context.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
-                if (subscriptionManager != null) {
-                    val activeSubscriptions = subscriptionManager.activeSubscriptionInfoCount
-                    // If there are active subscriptions, there's at least one SIM
-                    if (activeSubscriptions > 0) {
-                        return true
-                    }
-                }
-            } catch (e: Exception) {
-                // Fall back to checking telephony manager
+        // Check all physical SIM slots
+        val phoneCount = telephonyManager.phoneCount
+        for (slotIndex in 0 until phoneCount) {
+            val simState = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                telephonyManager.getSimState(slotIndex)
+            } else {
+                telephonyManager.simState
+            }
+
+            when (simState) {
+                TelephonyManager.SIM_STATE_READY,
+                TelephonyManager.SIM_STATE_NETWORK_LOCKED,
+                TelephonyManager.SIM_STATE_PIN_REQUIRED,
+                TelephonyManager.SIM_STATE_PUK_REQUIRED -> return true
             }
         }
 
-        // Fallback: Check default SIM state for single-SIM or older devices
-        return when (telephonyManager.simState) {
-            TelephonyManager.SIM_STATE_READY -> true
-            TelephonyManager.SIM_STATE_ABSENT -> false
-            TelephonyManager.SIM_STATE_NETWORK_LOCKED -> true
-            TelephonyManager.SIM_STATE_PIN_REQUIRED -> true
-            TelephonyManager.SIM_STATE_PUK_REQUIRED -> true
-            TelephonyManager.SIM_STATE_UNKNOWN -> false
-            else -> false
-        }
+        return false
     }
 }
