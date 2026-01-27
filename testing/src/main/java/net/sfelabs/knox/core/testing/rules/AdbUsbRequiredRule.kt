@@ -34,10 +34,15 @@ class AdbUsbRequiredRule : TestRule {
             val getMethod = systemProperties.getMethod("get", String::class.java, String::class.java)
             val port = getMethod.invoke(null, "service.adb.tcp.port", "-1") as String
 
+            println("AdbUsbRequiredRule: service.adb.tcp.port = '$port'")
+
             // If port is -1 or not set, ADB is USB-only (not over TCP/WiFi)
             val portNumber = port.toIntOrNull() ?: -1
-            portNumber <= 0
+            val isUsb = portNumber <= 0
+            println("AdbUsbRequiredRule: portNumber = $portNumber, isUsb = $isUsb")
+            isUsb
         } catch (e: Exception) {
+            println("AdbUsbRequiredRule: Exception accessing property: ${e.message}")
             // If we can't access the property, assume ADB USB is available (default mode)
             true
         }

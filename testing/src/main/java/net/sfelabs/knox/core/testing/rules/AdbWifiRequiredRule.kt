@@ -34,9 +34,14 @@ class AdbWifiRequiredRule : TestRule {
             val getMethod = systemProperties.getMethod("get", String::class.java, String::class.java)
             val port = getMethod.invoke(null, "service.adb.tcp.port", "-1") as String
 
+            println("AdbWifiRequiredRule: service.adb.tcp.port = '$port'")
+
             // If port is a positive number, ADB over TCP/WiFi is enabled
-            port.toIntOrNull()?.let { it > 0 } ?: false
+            val isWifi = port.toIntOrNull()?.let { it > 0 } ?: false
+            println("AdbWifiRequiredRule: isWifi = $isWifi")
+            isWifi
         } catch (e: Exception) {
+            println("AdbWifiRequiredRule: Exception accessing property: ${e.message}")
             // If we can't access the property, assume ADB WiFi is not available
             false
         }
