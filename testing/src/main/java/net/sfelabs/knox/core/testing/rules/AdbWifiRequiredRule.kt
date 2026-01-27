@@ -1,5 +1,6 @@
 package net.sfelabs.knox.core.testing.rules
 
+import android.annotation.SuppressLint
 import org.junit.Assume
 import org.junit.rules.TestRule
 import org.junit.runner.Description
@@ -25,6 +26,7 @@ class AdbWifiRequiredRule : TestRule {
         }
     }
 
+    @SuppressLint("PrivateApi")
     private fun isAdbWifiConnected(): Boolean {
         return try {
             // Use reflection to access SystemProperties.get() (hidden API)
