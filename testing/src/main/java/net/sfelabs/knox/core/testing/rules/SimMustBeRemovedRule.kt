@@ -28,7 +28,8 @@ class SimMustBeRemovedRule : TestRule {
         }
     }
 
-    fun isSimCardPresent(context: Context = ApplicationProvider.getApplicationContext()): Boolean {
+    @Suppress("DEPRECATION")
+    private fun isSimCardPresent(context: Context = ApplicationProvider.getApplicationContext()): Boolean {
         val telephonyManager = context.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
 
         return when (telephonyManager.simState) {
