@@ -36,11 +36,14 @@ class EthernetRequiredRule : TestRule {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
-        // Check all networks, not just the active one
-        // Note: getAllNetworks() is deprecated but appropriate for one-time synchronous checks
+        // Check all networks for an active ethernet connection
         return connectivityManager.allNetworks.any { network ->
-            val capabilities = connectivityManager.getNetworkCapabilities(network)
-            capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) == true
+            val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return@any false
+            val linkProperties = connectivityManager.getLinkProperties(network) ?: return@any false
+
+            // Must have ethernet transport AND have an assigned IP address (indicating it's actually connected)
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) &&
+                linkProperties.linkAddresses.isNotEmpty()
         }
     }
 }
