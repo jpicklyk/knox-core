@@ -6,10 +6,34 @@ import org.junit.rules.TestRule
 import org.junit.runner.Description
 import org.junit.runners.model.Statement
 
+/**
+ * Annotation to mark tests that require ADB to be connected via WiFi.
+ *
+ * **IMPORTANT LIMITATIONS:**
+ * - This checks if USB debugging is **disabled** in Developer Options, not if ADB is actually connected via WiFi
+ * - It cannot detect which ADB transport (USB or WiFi) is currently in use
+ * - ADB WiFi connection can be active even when USB debugging is enabled
+ * - This is an inverse check: assumes WiFi ADB when USB debugging is disabled
+ *
+ * **Usage:**
+ * To ensure tests run only with WiFi ADB:
+ * 1. Connect ADB via WiFi (adb connect <ip>:port or Android 11+ wireless debugging)
+ * 2. Disable USB debugging in Developer Options
+ * 3. Disconnect any USB cable to ensure USB debugging stays disabled
+ *
+ * **Common Use Case:**
+ * Tests that require WiFi ADB (e.g., to test ethernet functionality while keeping ADB connection)
+ * must manually disable USB debugging in settings.
+ */
 @Retention(AnnotationRetention.RUNTIME)
 @Target(AnnotationTarget.FUNCTION, AnnotationTarget.CLASS)
 annotation class AdbWifiRequired
 
+/**
+ * Rule to skip tests when USB debugging is enabled in Developer Options.
+ *
+ * See [AdbWifiRequired] for important limitations and usage notes.
+ */
 class AdbWifiRequiredRule : TestRule {
     override fun apply(statement: Statement, description: Description): Statement {
         return object : Statement() {

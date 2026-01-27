@@ -6,10 +6,34 @@ import org.junit.rules.TestRule
 import org.junit.runner.Description
 import org.junit.runners.model.Statement
 
+/**
+ * Annotation to mark tests that require ADB to be connected via USB.
+ *
+ * **IMPORTANT LIMITATIONS:**
+ * - This checks if USB debugging is **enabled** in Developer Options, not if ADB is actually connected via USB
+ * - It cannot detect which ADB transport (USB or WiFi) is currently in use
+ * - USB debugging can be enabled even when ADB is connected via WiFi
+ * - Physical USB connection (for charging, ethernet, etc.) doesn't guarantee ADB is using USB transport
+ *
+ * **Usage:**
+ * To ensure tests run only with USB ADB:
+ * 1. Connect ADB via USB cable
+ * 2. Ensure USB debugging is enabled in Developer Options
+ * 3. If also using WiFi ADB, disable USB debugging in Developer Options to force WiFi-only mode
+ *
+ * **Common Use Case:**
+ * Tests that disable WiFi or other network features should use this annotation to avoid losing
+ * ADB connection. However, you must manually ensure USB debugging is disabled when using WiFi ADB.
+ */
 @Retention(AnnotationRetention.RUNTIME)
 @Target(AnnotationTarget.FUNCTION, AnnotationTarget.CLASS)
 annotation class AdbUsbRequired
 
+/**
+ * Rule to skip tests when USB debugging is not enabled in Developer Options.
+ *
+ * See [AdbUsbRequired] for important limitations and usage notes.
+ */
 class AdbUsbRequiredRule : TestRule {
     override fun apply(statement: Statement, description: Description): Statement {
         return object : Statement() {
