@@ -9,14 +9,18 @@ import org.junit.runner.Description
 import org.junit.runners.model.Statement
 
 @Retention(AnnotationRetention.RUNTIME)
-@Target(AnnotationTarget.FUNCTION)
+@Target(AnnotationTarget.FUNCTION, AnnotationTarget.CLASS)
 annotation class SimRequired
 
 class SimRequiredRule : TestRule {
     override fun apply(statement: Statement, description: Description): Statement {
         return object : Statement() {
             override fun evaluate() {
-                if (description.getAnnotation(SimRequired::class.java) != null) {
+                // Check if annotation is present on either the test method or test class
+                val hasAnnotation = description.getAnnotation(SimRequired::class.java) != null ||
+                    description.testClass?.getAnnotation(SimRequired::class.java) != null
+
+                if (hasAnnotation) {
                     Assume.assumeTrue("SIM card is not present", isSimCardPresent(ApplicationProvider.getApplicationContext()))
                 }
                 statement.evaluate()
