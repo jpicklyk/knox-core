@@ -32,13 +32,20 @@ class AdbWifiRequiredRule : TestRule {
             // Use reflection to access SystemProperties.get() (hidden API)
             val systemProperties = Class.forName("android.os.SystemProperties")
             val getMethod = systemProperties.getMethod("get", String::class.java, String::class.java)
-            val port = getMethod.invoke(null, "service.adb.tcp.port", "-1") as String
 
-            println("AdbWifiRequiredRule: service.adb.tcp.port = '$port'")
+            // Check sys.usb.config to see if ADB is enabled over USB
+            val usbConfig = getMethod.invoke(null, "sys.usb.config", "") as String
+            val usbState = getMethod.invoke(null, "sys.usb.state", "") as String
 
-            // If port is a positive number, ADB over TCP/WiFi is enabled
-            val isWifi = port.toIntOrNull()?.let { it > 0 } ?: false
-            println("AdbWifiRequiredRule: isWifi = $isWifi")
+            println("AdbWifiRequiredRule: sys.usb.config = '$usbConfig'")
+            println("AdbWifiRequiredRule: sys.usb.state = '$usbState'")
+
+            // If USB config/state does NOT contain "adb", then ADB must be over WiFi
+            // (assuming tests are running, which means ADB is connected somehow)
+            val hasUsbAdb = usbConfig.contains("adb") || usbState.contains("adb")
+            val isWifi = !hasUsbAdb
+            println("AdbWifiRequiredRule: hasUsbAdb = $hasUsbAdb, isWifi = $isWifi")
+
             isWifi
         } catch (e: Exception) {
             println("AdbWifiRequiredRule: Exception accessing property: ${e.message}")

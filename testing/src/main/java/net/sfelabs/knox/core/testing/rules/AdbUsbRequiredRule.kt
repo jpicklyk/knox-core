@@ -32,15 +32,19 @@ class AdbUsbRequiredRule : TestRule {
             // Use reflection to access SystemProperties.get() (hidden API)
             val systemProperties = Class.forName("android.os.SystemProperties")
             val getMethod = systemProperties.getMethod("get", String::class.java, String::class.java)
-            val port = getMethod.invoke(null, "service.adb.tcp.port", "-1") as String
 
-            println("AdbUsbRequiredRule: service.adb.tcp.port = '$port'")
+            // Check sys.usb.config to see if ADB is enabled over USB
+            val usbConfig = getMethod.invoke(null, "sys.usb.config", "") as String
+            val usbState = getMethod.invoke(null, "sys.usb.state", "") as String
 
-            // If port is -1 or not set, ADB is USB-only (not over TCP/WiFi)
-            val portNumber = port.toIntOrNull() ?: -1
-            val isUsb = portNumber <= 0
-            println("AdbUsbRequiredRule: portNumber = $portNumber, isUsb = $isUsb")
-            isUsb
+            println("AdbUsbRequiredRule: sys.usb.config = '$usbConfig'")
+            println("AdbUsbRequiredRule: sys.usb.state = '$usbState'")
+
+            // If USB config/state contains "adb", USB debugging is active
+            val hasUsbAdb = usbConfig.contains("adb") || usbState.contains("adb")
+            println("AdbUsbRequiredRule: hasUsbAdb = $hasUsbAdb")
+
+            hasUsbAdb
         } catch (e: Exception) {
             println("AdbUsbRequiredRule: Exception accessing property: ${e.message}")
             // If we can't access the property, assume ADB USB is available (default mode)
