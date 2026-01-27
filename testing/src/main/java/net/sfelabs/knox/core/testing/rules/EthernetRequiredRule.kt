@@ -26,13 +26,17 @@ class EthernetRequiredRule : TestRule {
         }
     }
 
+    @Suppress("DEPRECATION")
     @SuppressLint("MissingPermission")
     private fun isEthernetConnected(): Boolean {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
-        val network = connectivityManager.activeNetwork ?: return false
-        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
-        return capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
+        // Check all networks, not just the active one
+        // Note: getAllNetworks() is deprecated but appropriate for one-time synchronous checks
+        return connectivityManager.allNetworks.any { network ->
+            val capabilities = connectivityManager.getNetworkCapabilities(network)
+            capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) == true
+        }
     }
 }
