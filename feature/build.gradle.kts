@@ -15,7 +15,4 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.mockk.core)
     testImplementation(libs.kotlinx.coroutines.test)
-
-    //TODO: Remove once all features are migrated to new format
-    implementation(libs.jackson.module)
 }
