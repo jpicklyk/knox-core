@@ -20,6 +20,7 @@ dependencies {
     api(libs.kotlinx.coroutines.test)
 
     implementation(project(":knox-core:common"))
+    implementation(project(":knox-core:android"))
     implementation(libs.kotlin.reflect)
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
