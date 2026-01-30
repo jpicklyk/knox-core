@@ -21,6 +21,78 @@ import net.sfelabs.knox.core.feature.processor.utils.GeneratedPackages
 import net.sfelabs.knox.core.feature.processor.utils.NameUtils.classNameToPolicyName
 import net.sfelabs.knox.core.feature.processor.utils.toClassName
 
+/**
+ * Generates [PolicyComponent] wrapper classes for policies annotated with `@PolicyDefinition`.
+ *
+ * ## Generated Code Structure
+ *
+ * For each annotated policy class, this generator creates a component class:
+ *
+ * ```kotlin
+ * // Input: @PolicyDefinition class AutoCallPickupPolicy
+ * // Output:
+ * class AutoCallPickupPolicyComponent : PolicyComponent<AutoCallPickupState> {
+ *     private val policyImpl = AutoCallPickupPolicy()
+ *     override val policyName = "auto-call-pickup"
+ *     override val handler = object : PolicyHandler<AutoCallPickupState> { ... }
+ *     // ... other properties
+ * }
+ * ```
+ *
+ * ## Empty Constructor Constraint
+ *
+ * **Important:** Generated components instantiate policies using empty constructors (`%T()`).
+ * This is a deliberate architectural decision, not an oversight.
+ *
+ * ### Why Empty Constructors?
+ *
+ * KSP (Kotlin Symbol Processing) runs at compile time, **before** dependency injection
+ * frameworks like Hilt process their annotations. This creates a fundamental constraint:
+ *
+ * 1. KSP cannot access Hilt's dependency graph (it doesn't exist yet)
+ * 2. KSP cannot know what dependencies a class needs at runtime
+ * 3. Generated code must be statically valid without DI framework involvement
+ *
+ * ### The Processing Order
+ *
+ * ```
+ * 1. KSP runs         → Generates XxxComponent with `XxxPolicy()`
+ * 2. Hilt runs        → Processes @Module, @Provides annotations
+ * 3. Compile completes → Both generated sources are compiled
+ * 4. Runtime          → Hilt creates dependency graph, provides components
+ * ```
+ *
+ * ### How Policies Access Dependencies
+ *
+ * Since policies cannot receive dependencies via constructor, they use the service locator
+ * pattern via [WithAndroidApplicationContext]:
+ *
+ * ```kotlin
+ * class MyPolicy : BooleanStatePolicy() {
+ *     // Use case instantiated with empty constructor
+ *     private val useCase = MyUseCase()
+ * }
+ *
+ * class MyUseCase : WithAndroidApplicationContext, SuspendingUseCase<...>() {
+ *     override suspend fun execute(params: Params): ApiResult<...> {
+ *         // Access context via the interface
+ *         val service = applicationContext.getSystemService(...)
+ *     }
+ * }
+ * ```
+ *
+ * ### Future Improvements
+ *
+ * A DI-agnostic architecture has been proposed that would:
+ * - Generate components with `ContextProvider` constructor parameters
+ * - Generate a factory instead of Hilt-specific modules
+ * - Support Hilt, Koin, or no DI framework
+ *
+ * See the GitHub issue on knox-core for details.
+ *
+ * @see net.sfelabs.knox.core.android.AndroidApplicationContextProvider
+ * @see net.sfelabs.knox.core.android.WithAndroidApplicationContext
+ */
 class ComponentGenerator(
     private val environment: SymbolProcessorEnvironment
 ) {
@@ -37,6 +109,7 @@ class ComponentGenerator(
                     .parameterizedBy(policy.valueType.toClassName())
             )
             .addProperty(
+                // Note: Empty constructor call is intentional. See class KDoc for explanation.
                 PropertySpec.builder("policyImpl", ClassName(policy.packageName, policy.className))
                     .addModifiers(KModifier.PRIVATE)
                     .initializer("%T()", ClassName(policy.packageName, policy.className))
