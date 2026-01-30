@@ -100,13 +100,8 @@ class AndroidContextProviderRule(
                 }
                 AndroidApplicationContextProvider.init(provider)
 
-                try {
-                    // Run the test
-                    base.evaluate()
-                } finally {
-                    // Cleanup (context reference cleared but provider remains initialized)
-                    _context = null
-                }
+                // Run the test
+                base.evaluate()
             }
         }
     }
