@@ -59,8 +59,9 @@ KSP annotation processor that generates policy boilerplate from `@PolicyDefiniti
 
 Test utilities and helpers:
 
-- Test annotations (`@DebugUsbRequired`, `@TacticalSdkSuppress`)
-- Test rules and utilities for Knox testing
+- **Context Setup** - `TestContextSetup` and `AndroidContextProviderRule` for initializing context in tests
+- **Test Annotations** - `@AdbUsbRequired`, `@SimRequired`, etc. for conditional test execution
+- **Test Rules** - JUnit rules for device-specific test requirements
 
 ### ui
 
@@ -180,18 +181,85 @@ val formattedText = resourceProvider.getString(R.string.my_format, arg1, arg2)
 
 ## Testing
 
-knox-core provides testing utilities in the `testing` submodule:
+knox-core provides testing utilities in the `testing` submodule.
+
+### Context Setup for Use Case Tests
+
+Use cases that implement `WithAndroidApplicationContext` require the context provider to be
+initialized before tests run. The testing module provides two approaches:
+
+**Option 1: JUnit Rule (Recommended)**
 
 ```kotlin
-// Use test annotations
-@DebugUsbRequired
-class MyUsbTests {
-    // Tests that require USB debugging
-}
+@RunWith(AndroidJUnit4::class)
+class MyKnoxTests {
 
-@TacticalSdkSuppress(minReleaseVersion = 100)
-class MyTacticalTests {
-    // Tests for specific SDK versions
+    @get:Rule
+    val contextRule = AndroidContextProviderRule()
+
+    @Test
+    fun testUseCase() = runTest {
+        // Context is automatically initialized
+        val result = GetBrightnessValueUseCase().invoke(Unit)
+        assertThat(result).isInstanceOf(ApiResult.Success::class.java)
+    }
+
+    @Test
+    fun testWithContextAccess() {
+        // Access the context if needed for test setup
+        val packageName = contextRule.context.packageName
+    }
+}
+```
+
+**Option 2: Manual Setup**
+
+```kotlin
+@RunWith(AndroidJUnit4::class)
+class MyKnoxTests {
+
+    @Before
+    fun setup() {
+        TestContextSetup.initFromInstrumentation()
+    }
+
+    @Test
+    fun testUseCase() = runTest {
+        val result = GetBrightnessValueUseCase().invoke(Unit)
+        // ...
+    }
+}
+```
+
+**Option 3: Custom/Mock Context**
+
+```kotlin
+@Before
+fun setup() {
+    val mockContext = mockk<Context>(relaxed = true)
+    TestContextSetup.init(mockContext)
+}
+```
+
+### Test Annotations and Rules
+
+```kotlin
+@RunWith(AndroidJUnit4::class)
+class MyKnoxTests {
+
+    @get:Rule
+    val contextRule = AndroidContextProviderRule()
+
+    @get:Rule
+    val simRule = SimRequiredRule()
+
+    @Test
+    @AdbUsbRequired  // Skip if USB debugging not available
+    fun testThatRequiresUsb() { ... }
+
+    @Test
+    @SimRequired  // Skip if no SIM card present
+    fun testThatRequiresSim() { ... }
 }
 ```
 
@@ -235,15 +303,6 @@ class MyUseCase : WithAndroidApplicationContext, SuspendingUseCase<Unit, Result>
 
 **Memory Safety:** This is safe because only Application context (not Activity) is stored.
 
-**Testing:** Initialize the provider in test setup:
-
-```kotlin
-@Before
-fun setup() {
-    AndroidApplicationContextProvider.init(object : AndroidApplicationContextProvider {
-        override fun getContext() = ApplicationProvider.getApplicationContext()
-    })
-}
-```
+**Testing:** The `testing` module provides utilities to simplify context setup. See [Testing](#testing) section above.
 
 See [GitHub Issue #4](https://github.com/jpicklyk/knox-core/issues/4) for a proposed DI-agnostic refactoring that would support Hilt, Koin, or no DI framework.
