@@ -30,8 +30,9 @@ class ModuleGenerator(
     }
 
     private fun generateFeatureModule(policy: ProcessedPolicy) {
-        val moduleSpec = TypeSpec.classBuilder("${policy.className}Module")
-            .addModifiers(KModifier.ABSTRACT)
+        val componentClassName = ClassName(getGeneratedPackage(), "${policy.className}Component")
+
+        val moduleSpec = TypeSpec.objectBuilder("${policy.className}Module")
             .addAnnotation(ClassName("dagger", "Module"))
             .addAnnotation(
                 AnnotationSpec.builder(ClassName("dagger.hilt", "InstallIn"))
@@ -39,20 +40,16 @@ class ModuleGenerator(
                     .build()
             )
             .addFunction(
-                FunSpec.builder("bind")
-                    .addModifiers(KModifier.ABSTRACT)
-                    .addAnnotation(ClassName("dagger", "Binds"))
+                FunSpec.builder("provide${policy.className}Component")
+                    .addAnnotation(ClassName("dagger", "Provides"))
                     .addAnnotation(ClassName("dagger.multibindings", "IntoSet"))
-                    .addParameter(
-                        "impl",
-                        ClassName(getGeneratedPackage(), "${policy.className}Component")
-                    )
                     .returns(
                         ClassName(PackageName.FEATURE_PUBLIC.value, "PolicyComponent")
                             .parameterizedBy(
                                 WildcardTypeName.producerOf(PolicyState::class.asClassName())
                             )
                     )
+                    .addStatement("return %T()", componentClassName)
                     .build()
             )
             .build()

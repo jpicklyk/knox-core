@@ -32,11 +32,6 @@ class ComponentGenerator(
 
     private fun generateComponent(policy: ProcessedPolicy) {
         val componentSpec = TypeSpec.classBuilder("${policy.className}Component")
-            .primaryConstructor(
-                FunSpec.constructorBuilder()
-                    .addAnnotation(ClassName.bestGuess("javax.inject.Inject"))
-                    .build()
-            )
             .addSuperinterface(
                 ClassName.bestGuess(PolicyComponent::class.qualifiedName!!)
                     .parameterizedBy(policy.valueType.toClassName())
