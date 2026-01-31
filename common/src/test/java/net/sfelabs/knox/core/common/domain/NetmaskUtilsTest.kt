@@ -1,6 +1,5 @@
-package net.sfelabs.knox.core.domain
+package net.sfelabs.knox.core.common.domain
 
-import net.sfelabs.knox.core.common.domain.NetmaskUtils
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

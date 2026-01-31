@@ -7,7 +7,7 @@ plugins {
 }
 
 android {
-    namespace = "net.sfelabs.knox.common"
+    namespace = "net.sfelabs.knox.core.common"
 }
 
 dependencies {
