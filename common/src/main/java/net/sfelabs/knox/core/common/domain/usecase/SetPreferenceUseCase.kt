@@ -1,4 +1,4 @@
-package net.sfelabs.knox.core.common.domain.use_case
+package net.sfelabs.knox.core.common.domain.usecase
 
 import net.sfelabs.knox.core.common.domain.repository.PreferencesRepository
 import javax.inject.Inject

@@ -36,11 +36,25 @@ Android-specific utilities for context management:
 Shared utilities and domain logic:
 
 - **Coroutines** - `DispatcherProvider` for coroutine dispatcher abstraction
-- **Data** - `DataStoreSource` for preferences storage
-- **Domain** - Utility functions for Knox HDM, netmask calculations, package management
+- **Data** - `DataStoreSource` and `DefaultDataStoreSource` for preferences storage
+- **Domain** - `PreferencesRepository` and utility functions for Knox HDM, netmask calculations, package management
 - **Presentation** - `ResourceProvider` for string resource access
 - **Result** - Generic `Result` type for operation outcomes
 - **UiText** - Abstraction for UI text (string resources or dynamic text)
+
+#### DI-Agnostic Singleton Pattern
+
+`DataStoreSource` and `PreferencesRepository` use a hybrid singleton pattern that works with or without DI:
+
+```kotlin
+// Without DI - use getInstance()
+val prefs = PreferencesRepository.getInstance(context)
+
+// With Hilt - inject directly (knox-hilt registers via setInstance())
+@Inject lateinit var prefs: PreferencesRepository
+```
+
+The `setInstance()` method allows DI frameworks to register their managed singletons, which are then returned by `getInstance()` for non-DI code.
 
 ### feature
 
@@ -62,6 +76,7 @@ Test utilities and helpers:
 - **Context Setup** - `TestContextSetup` and `AndroidContextProviderRule` for initializing context in tests
 - **Test Annotations** - `@AdbUsbRequired`, `@SimRequired`, etc. for conditional test execution
 - **Test Rules** - JUnit rules for device-specific test requirements
+- **Fakes** - In-memory fake implementations for behavior-based testing (see [Testing Fakes](#testing-fakes))
 
 ### ui
 
@@ -262,6 +277,101 @@ class MyKnoxTests {
     fun testThatRequiresSim() { ... }
 }
 ```
+
+### Testing Fakes
+
+The testing module provides fake implementations as an alternative to mocks for behavior-based testing.
+
+#### FakePreferencesRepository
+
+In-memory implementation of `PreferencesRepository` with Flow support:
+
+```kotlin
+class MyUseCaseTest {
+    private val repository = FakePreferencesRepository()
+
+    @Before
+    fun setup() {
+        repository.clear()
+    }
+
+    @Test
+    fun `test preference round trip`() = runTest {
+        // Arrange - set up initial state
+        repository.setValueSync("dark_mode", true)
+
+        // Act - execute the use case
+        val useCase = GetPreferenceUseCase<Boolean>(repository)
+        val result = useCase("dark_mode", false).first()
+
+        // Assert
+        assertTrue(result)
+    }
+
+    @Test
+    fun `test setValue stores value`() = runTest {
+        val useCase = SetPreferenceUseCase<String>(repository)
+
+        useCase("username", "john_doe")
+
+        assertEquals("john_doe", repository.getStoredValue<String>("username"))
+    }
+}
+```
+
+#### FakeDataStoreSource
+
+In-memory implementation of `DataStoreSource` for lower-level testing:
+
+```kotlin
+private val dataStore = FakeDataStoreSource()
+
+@Test
+fun `test data persistence`() = runTest {
+    dataStore.setValue("key", 42)
+    val result = dataStore.getValue("key", 0).first()
+    assertEquals(42, result)
+}
+```
+
+#### TestDispatcherProvider
+
+Test implementation of `DispatcherProvider` for coroutine testing:
+
+```kotlin
+@OptIn(ExperimentalCoroutinesApi::class)
+class MyViewModelTest {
+    private val testDispatcher = UnconfinedTestDispatcher()
+    private val dispatcherProvider = TestDispatcherProvider(testDispatcher)
+
+    @Test
+    fun `test async operation`() = runTest(testDispatcher) {
+        val viewModel = MyViewModel(dispatcherProvider)
+        viewModel.loadData()
+        // All dispatchers (io, default, main) use the test dispatcher
+    }
+}
+```
+
+#### Test Helper Methods
+
+All fakes provide these helper methods:
+
+| Method | Description |
+|--------|-------------|
+| `setValueSync(key, value)` | Set a value synchronously (useful in test setup) |
+| `getStoredValue<T>(key)` | Get the raw stored value without Flow |
+| `clear()` | Reset all stored values between tests |
+| `getAllKeys()` | Get all keys currently stored |
+
+#### When to Use Fakes vs Mocks
+
+| Use Fakes | Use Mocks (MockK) |
+|-----------|-------------------|
+| Testing data flow (get/set round trips) | Verifying specific method calls |
+| Integration-style unit tests | Testing error scenarios |
+| Multiple operations in sequence | Testing edge cases (null, exceptions) |
+| Reusable test fixtures | One-off interaction verification |
 
 ## Requirements
 

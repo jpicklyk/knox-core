@@ -1,4 +1,4 @@
-package net.sfelabs.knox.core.knox.feature
+package net.sfelabs.knox.core.feature
 
 import io.mockk.coEvery
 import io.mockk.mockk

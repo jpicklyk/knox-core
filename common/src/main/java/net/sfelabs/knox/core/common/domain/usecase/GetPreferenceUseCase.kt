@@ -1,4 +1,4 @@
-package net.sfelabs.knox.core.common.domain.use_case
+package net.sfelabs.knox.core.common.domain.usecase
 
 import kotlinx.coroutines.flow.Flow
 import net.sfelabs.knox.core.common.domain.repository.PreferencesRepository

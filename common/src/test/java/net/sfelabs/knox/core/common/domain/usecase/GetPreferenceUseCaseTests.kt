@@ -1,4 +1,4 @@
-package net.sfelabs.knox.core.domain.use_case
+package net.sfelabs.knox.core.common.domain.usecase
 
 import io.mockk.every
 import io.mockk.mockk
@@ -6,7 +6,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import net.sfelabs.knox.core.common.domain.repository.PreferencesRepository
-import net.sfelabs.knox.core.common.domain.use_case.GetPreferenceUseCase
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
