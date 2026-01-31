@@ -2,6 +2,7 @@ package net.sfelabs.knox.core.common.domain.repository
 
 import android.content.Context
 import kotlinx.coroutines.flow.Flow
+import net.sfelabs.knox.core.android.AndroidApplicationContextProvider
 import net.sfelabs.knox.core.common.data.datasource.DataStoreSource
 
 /**
@@ -32,24 +33,26 @@ interface PreferencesRepository {
         /**
          * Gets the singleton instance of [PreferencesRepository].
          *
-         * @param context Required for first initialization if no instance exists.
-         *                Pass null for subsequent calls.
+         * @param context Optional context for initialization. If null, will attempt to use
+         *                [AndroidApplicationContextProvider] to obtain the context.
          * @return The singleton [PreferencesRepository] instance
-         * @throws IllegalStateException if no instance exists and context is null
+         * @throws IllegalStateException if no instance exists and context cannot be obtained
          */
         @Synchronized
         fun getInstance(context: Context? = null): PreferencesRepository {
             instance?.let { return it }
 
-            if (context == null) {
+            val resolvedContext = context ?: try {
+                AndroidApplicationContextProvider.get()
+            } catch (e: IllegalStateException) {
                 throw IllegalStateException(
                     "PreferencesRepository not initialized. Either call getInstance(context) first, " +
-                    "or ensure Hilt initialization has completed."
+                    "ensure Hilt initialization has completed, or initialize AndroidApplicationContextProvider."
                 )
             }
 
             return DefaultPreferencesRepository(
-                DataStoreSource.getInstance(context)
+                DataStoreSource.getInstance(resolvedContext)
             ).also { instance = it }
         }
 

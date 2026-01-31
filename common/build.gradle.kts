@@ -15,6 +15,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     //implementation(libs.jackson.module)
     implementation(project(":knox-core:usecase-executor"))
+    implementation(project(":knox-core:android"))
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.runtime)

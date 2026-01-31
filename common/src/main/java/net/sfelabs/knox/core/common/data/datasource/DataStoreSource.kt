@@ -5,6 +5,7 @@ import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.emptyPreferences
 import kotlinx.coroutines.flow.Flow
+import net.sfelabs.knox.core.android.AndroidApplicationContextProvider
 import okio.Path.Companion.toPath
 
 /**
@@ -37,23 +38,25 @@ interface DataStoreSource {
         /**
          * Gets the singleton instance of [DataStoreSource].
          *
-         * @param context Required for first initialization if no instance exists.
-         *                Pass null for subsequent calls.
+         * @param context Optional context for initialization. If null, will attempt to use
+         *                [AndroidApplicationContextProvider] to obtain the context.
          * @return The singleton [DataStoreSource] instance
-         * @throws IllegalStateException if no instance exists and context is null
+         * @throws IllegalStateException if no instance exists and context cannot be obtained
          */
         @Synchronized
         fun getInstance(context: Context? = null): DataStoreSource {
             instance?.let { return it }
 
-            if (context == null) {
+            val resolvedContext = context ?: try {
+                AndroidApplicationContextProvider.get()
+            } catch (e: IllegalStateException) {
                 throw IllegalStateException(
                     "DataStoreSource not initialized. Either call getInstance(context) first, " +
-                    "or ensure Hilt initialization has completed."
+                    "ensure Hilt initialization has completed, or initialize AndroidApplicationContextProvider."
                 )
             }
 
-            return createDefaultInstance(context).also { instance = it }
+            return createDefaultInstance(resolvedContext).also { instance = it }
         }
 
         /**
