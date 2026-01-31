@@ -29,7 +29,7 @@ class ModuleGenerator(
     }
 
     private fun generateFeatureModule(policy: ProcessedPolicy) {
-        val componentClassName = ClassName(getGeneratedPackage(), "${policy.className}Component")
+        val componentClassName = ClassName(getFeaturePackage(), "${policy.className}Component")
 
         val moduleSpec = TypeSpec.objectBuilder("${policy.className}Module")
             .addAnnotation(ClassName("dagger", "Module"))
