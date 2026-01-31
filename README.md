@@ -36,11 +36,25 @@ Android-specific utilities for context management:
 Shared utilities and domain logic:
 
 - **Coroutines** - `DispatcherProvider` for coroutine dispatcher abstraction
-- **Data** - `DataStoreSource` for preferences storage
-- **Domain** - Utility functions for Knox HDM, netmask calculations, package management
+- **Data** - `DataStoreSource` and `DefaultDataStoreSource` for preferences storage
+- **Domain** - `PreferencesRepository` and utility functions for Knox HDM, netmask calculations, package management
 - **Presentation** - `ResourceProvider` for string resource access
 - **Result** - Generic `Result` type for operation outcomes
 - **UiText** - Abstraction for UI text (string resources or dynamic text)
+
+#### DI-Agnostic Singleton Pattern
+
+`DataStoreSource` and `PreferencesRepository` use a hybrid singleton pattern that works with or without DI:
+
+```kotlin
+// Without DI - use getInstance()
+val prefs = PreferencesRepository.getInstance(context)
+
+// With Hilt - inject directly (knox-hilt registers via setInstance())
+@Inject lateinit var prefs: PreferencesRepository
+```
+
+The `setInstance()` method allows DI frameworks to register their managed singletons, which are then returned by `getInstance()` for non-DI code.
 
 ### feature
 
