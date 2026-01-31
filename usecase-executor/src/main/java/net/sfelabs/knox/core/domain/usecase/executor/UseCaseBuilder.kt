@@ -12,7 +12,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import net.sfelabs.knox.core.domain.usecase.model.ApiResult
 import net.sfelabs.knox.core.domain.usecase.model.DefaultApiError
-import java.lang.ref.WeakReference
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -27,9 +26,9 @@ import kotlin.time.Duration.Companion.milliseconds
  * - [SuspendingUseCase] implementations (asynchronous with coroutine context switching)
  *
  * Memory Management:
- * - Error handlers are stored as WeakReferences to prevent memory leaks
- * - State change listeners use WeakReferences to allow proper garbage collection
- * - Automatic cleanup of resources after execution completes
+ * - All callbacks and references are automatically cleaned up after execution completes
+ * - For Android, use lifecycle-aware scopes (viewModelScope, lifecycleScope) via [withScope]
+ *   to ensure proper cancellation when the lifecycle owner is destroyed
  *
  * Coroutine Integration:
  * - Supports custom CoroutineScope via [withScope]
@@ -180,7 +179,7 @@ class UseCaseBuilder {
             val execute: suspend () -> ApiResult<*>,
             val predicate: (suspend () -> Boolean)? = null,
             val fallback: (suspend () -> ApiResult<*>)? = null,
-            val errorHandler: WeakReference<((ApiResult.Error) -> Unit)>? = null,
+            val errorHandler: ((ApiResult.Error) -> Unit)? = null,
             val retryPolicy: Builder.RetryPolicy? = null
         ) : ExecutionUnit()
 
@@ -209,12 +208,12 @@ class UseCaseBuilder {
     )
 
     class Builder {
-        private var coroutineScope: WeakReference<CoroutineScope>? = null
+        private var coroutineScope: CoroutineScope? = null
         private val executionUnits = mutableListOf<ExecutionUnit>()
         private var currentGroup = ExecutionUnit.OperationGroup()
         private var timeoutDuration: Duration? = null
         private var retryPolicy: RetryPolicy? = null
-        private var stateListener: WeakReference<((UseCaseBuilderState) -> Unit)>? = null
+        private var stateListener: ((UseCaseBuilderState) -> Unit)? = null
         private val executedOperations = mutableListOf<ExecutedOperation>()
         private val results = mutableListOf<ApiResult<*>>()
 
@@ -227,7 +226,7 @@ class UseCaseBuilder {
         )
 
         fun onStateChanged(listener: (UseCaseBuilderState) -> Unit): Builder {
-            stateListener = WeakReference(listener)
+            stateListener = listener
             return this
         }
 
@@ -239,7 +238,7 @@ class UseCaseBuilder {
                 override val executedOperations: List<ExecutedOperation> = currentExecutedOperations
                 override val currentResults: List<ApiResult<*>> = currentResults
             }
-            stateListener?.get()?.invoke(state)
+            stateListener?.invoke(state)
         }
 
         fun add(operation: suspend () -> ApiResult<*>): Builder {
@@ -289,7 +288,7 @@ class UseCaseBuilder {
             val lastOp = currentGroup.operations.lastOrNull()
                 ?: throw IllegalStateException("No operation to apply error handler to")
             currentGroup.operations[currentGroup.operations.lastIndex] =
-                lastOp.copy(errorHandler = WeakReference(handler))
+                lastOp.copy(errorHandler = handler)
             return this
         }
 
@@ -318,7 +317,7 @@ class UseCaseBuilder {
         }
 
         fun withScope(scope: CoroutineScope): Builder {
-            coroutineScope = WeakReference(scope)
+            coroutineScope = scope
             return this
         }
 
@@ -327,7 +326,7 @@ class UseCaseBuilder {
                 executionUnits.add(currentGroup)
             }
 
-            val scope = coroutineScope?.get() ?: CoroutineScope(Dispatchers.IO)
+            val scope = coroutineScope ?: CoroutineScope(Dispatchers.IO)
 
             return withContext(scope.coroutineContext) {  // Use the provided scope's context
                 try {
@@ -374,7 +373,7 @@ class UseCaseBuilder {
 
             // Handle errors if handler exists
             if (result is ApiResult.Error) {
-                operation.errorHandler?.get()?.invoke(result)
+                operation.errorHandler?.invoke(result)
             }
 
             // Try fallback if main operation failed
