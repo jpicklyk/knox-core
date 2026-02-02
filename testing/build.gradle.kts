@@ -19,6 +19,7 @@ dependencies {
     api(libs.androidx.test.uiautomator)
     api(libs.hilt.android.testing)
     api(libs.junit)
+    api(libs.kotlin.test)
     api(libs.kotlinx.coroutines.test)
 
     implementation(projects.knoxCore.common)
