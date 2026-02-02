@@ -30,5 +30,5 @@ dependencies {
 
 
     testImplementation(libs.junit)
-    androidTestImplementation(project(":knox-core:testing"))
+    androidTestImplementation(projects.knoxCore.testing)
 }

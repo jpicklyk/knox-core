@@ -1,9 +1,9 @@
 plugins {
-    kotlin("jvm")
+    alias(libs.plugins.kotlin.jvm)
 }
 
 dependencies {
-    implementation(project(":knox-core:usecase-executor"))
+    implementation(projects.knoxCore.usecaseExecutor)
     implementation(libs.kotlin.stdlib)
     implementation(libs.kotlin.reflect)
     implementation(libs.kotlinx.coroutines.core)

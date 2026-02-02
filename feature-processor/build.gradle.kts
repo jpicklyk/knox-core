@@ -10,7 +10,7 @@ dependencies {
     implementation(libs.ksp.symbol.processing.api)
     implementation(libs.kotlin.poet)
     implementation(libs.kotlin.poet.ksp)
-    implementation(project(":knox-core:usecase-executor"))
-    implementation(project(":knox-core:feature"))
+    implementation(projects.knoxCore.usecaseExecutor)
+    implementation(projects.knoxCore.feature)
     // For shared models/interfaces
 }
