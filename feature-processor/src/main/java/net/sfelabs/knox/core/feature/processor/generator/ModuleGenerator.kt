@@ -40,6 +40,7 @@ class ModuleGenerator(
             )
             .addFunction(
                 FunSpec.builder("provide${policy.className}Component")
+                    .addAnnotation(JvmStatic::class)
                     .addAnnotation(ClassName("dagger", "Provides"))
                     .addAnnotation(ClassName("dagger.multibindings", "IntoSet"))
                     .returns(
