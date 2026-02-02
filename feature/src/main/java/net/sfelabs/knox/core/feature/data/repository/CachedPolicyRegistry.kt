@@ -4,6 +4,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import net.sfelabs.knox.core.domain.usecase.model.ApiResult
 import net.sfelabs.knox.core.domain.usecase.model.DefaultApiError
+import net.sfelabs.knox.core.feature.api.PolicyCapability
 import net.sfelabs.knox.core.feature.api.PolicyCategory
 import net.sfelabs.knox.core.feature.api.PolicyComponent
 import net.sfelabs.knox.core.feature.api.PolicyKey
@@ -68,4 +69,16 @@ class CachedPolicyRegistry(private val delegate: DefaultPolicyRegistry) : Policy
     override fun <T : PolicyState> getHandler(key: PolicyKey<T>) = delegate.getHandler(key)
     override suspend fun getPolicies(category: PolicyCategory) = delegate.getPolicies(category)
     override fun isRegistered(key: PolicyKey<*>) = delegate.isRegistered(key)
+
+    // Capability-based query delegations
+    override fun getByCapability(capability: PolicyCapability) = delegate.getByCapability(capability)
+    override fun getByCapabilities(capabilities: Set<PolicyCapability>, matchAll: Boolean) =
+        delegate.getByCapabilities(capabilities, matchAll)
+    override fun getByCategory(category: PolicyCategory) = delegate.getByCategory(category)
+    override fun query(
+        category: PolicyCategory?,
+        capabilities: Set<PolicyCapability>?,
+        matchAllCapabilities: Boolean
+    ) = delegate.query(category, capabilities, matchAllCapabilities)
+    override fun getAllComponents() = delegate.getAllComponents()
 }

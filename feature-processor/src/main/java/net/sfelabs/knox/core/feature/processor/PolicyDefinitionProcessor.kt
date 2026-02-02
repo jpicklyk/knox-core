@@ -6,6 +6,7 @@ import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSType
+import net.sfelabs.knox.core.feature.api.PolicyCapability
 import net.sfelabs.knox.core.feature.api.PolicyCategory
 import net.sfelabs.knox.core.feature.api.PolicyState
 import net.sfelabs.knox.core.feature.processor.generator.ComponentGenerator
@@ -145,6 +146,21 @@ class PolicyDefinitionProcessor(
             else -> return null
         }
 
+        // Extract capabilities array from annotation
+        val capabilitiesValue = annotation.arguments
+            .find { it.name?.asString() == "capabilities" }
+            ?.value
+        val capabilities = when (capabilitiesValue) {
+            is List<*> -> capabilitiesValue.mapNotNull { item ->
+                when (item) {
+                    is KSClassDeclaration -> PolicyCapability.valueOf(item.simpleName.asString())
+                    is KSType -> PolicyCapability.valueOf(item.declaration.simpleName.asString())
+                    else -> null
+                }
+            }.toSet()
+            else -> emptySet()
+        }
+
         return ProcessedPolicy(
             className = classDeclaration.simpleName.asString(),
             packageName = classDeclaration.packageName.asString(),
@@ -155,6 +171,7 @@ class PolicyDefinitionProcessor(
                 .find { it.name?.asString() == "description" }
                 ?.value as? String ?: return null,
             category = category,
+            capabilities = capabilities,
             valueType = valueType,
             configType = configType,
             declaration = classDeclaration

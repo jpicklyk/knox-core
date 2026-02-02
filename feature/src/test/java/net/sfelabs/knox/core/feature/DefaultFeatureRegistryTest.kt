@@ -6,10 +6,13 @@ import junit.framework.TestCase
 import kotlinx.coroutines.test.runTest
 import net.sfelabs.knox.core.domain.usecase.model.ApiError
 import net.sfelabs.knox.core.domain.usecase.model.DefaultApiError
+import net.sfelabs.knox.core.feature.api.PolicyCapability
 import net.sfelabs.knox.core.feature.api.PolicyCategory
 import net.sfelabs.knox.core.feature.api.PolicyComponent
 import net.sfelabs.knox.core.feature.api.PolicyKey
 import net.sfelabs.knox.core.feature.api.PolicyState
+import net.sfelabs.knox.core.feature.api.PolicyUiConverter
+import net.sfelabs.knox.core.feature.ui.model.ConfigurationOption
 import net.sfelabs.knox.core.feature.data.repository.DefaultPolicyRegistry
 import net.sfelabs.knox.core.feature.domain.usecase.handler.PolicyHandler
 import org.junit.Before
@@ -39,6 +42,14 @@ class DefaultFeatureRegistryTest {
     }
     private val mockHandler = mockk<PolicyHandler<PolicyState>>()
 
+    // Test UiConverter implementation
+    private val testUiConverter = object : PolicyUiConverter<PolicyState> {
+        override fun fromUiState(uiEnabled: Boolean, options: List<ConfigurationOption>): PolicyState {
+            return TestState(isEnabled = uiEnabled)
+        }
+        override fun getConfigurationOptions(state: PolicyState): List<ConfigurationOption> = emptyList()
+    }
+
     @Before
     fun setup() {
         registry = DefaultPolicyRegistry()
@@ -50,6 +61,8 @@ class DefaultFeatureRegistryTest {
             override val handler = mockHandler
             override val defaultValue = TestState(isEnabled = false)
             override val key = mockKey
+            override val uiConverter = testUiConverter
+            override val capabilities = emptySet<PolicyCapability>()
         }
     }
 
@@ -113,6 +126,8 @@ class DefaultFeatureRegistryTest {
             override val handler = mockHandler2
             override val defaultValue = TestState(isEnabled = false)
             override val key = mockKey2
+            override val uiConverter = testUiConverter
+            override val capabilities = emptySet<PolicyCapability>()
         }
 
         coEvery { mockHandler.getState() } returns TestState(isEnabled = true)

@@ -11,10 +11,12 @@ import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.PropertySpec
 import com.squareup.kotlinpoet.TypeSpec
 import net.sfelabs.knox.core.domain.usecase.model.ApiResult
+import net.sfelabs.knox.core.feature.api.PolicyCapability
 import net.sfelabs.knox.core.feature.api.PolicyCategory
 import net.sfelabs.knox.core.feature.api.PolicyComponent
 import net.sfelabs.knox.core.feature.api.PolicyKey
 import net.sfelabs.knox.core.feature.api.PolicyParameters
+import net.sfelabs.knox.core.feature.api.PolicyUiConverter
 import net.sfelabs.knox.core.feature.domain.usecase.handler.PolicyHandler
 import net.sfelabs.knox.core.feature.processor.model.ProcessedPolicy
 import net.sfelabs.knox.core.feature.processor.utils.GeneratedPackages
@@ -167,8 +169,42 @@ class ComponentGenerator(
                     "%T",
                     ClassName(getGeneratedPackage(), "${policy.className}Key")
                 )
+                .build(),
+
+            // UI converter delegates to the policy implementation which implements PolicyUiConverter
+            PropertySpec.builder("uiConverter",
+                ClassName.bestGuess(PolicyUiConverter::class.qualifiedName!!)
+                    .parameterizedBy(stateType)
+            )
+                .addModifiers(KModifier.OVERRIDE)
+                .initializer("policyImpl")
+                .build(),
+
+            // Capabilities from annotation
+            PropertySpec.builder("capabilities",
+                ClassName("kotlin.collections", "Set")
+                    .parameterizedBy(ClassName.bestGuess(PolicyCapability::class.qualifiedName!!))
+            )
+                .addModifiers(KModifier.OVERRIDE)
+                .initializer(buildCapabilitiesInitializer(policy))
                 .build()
         )
+    }
+
+    private fun buildCapabilitiesInitializer(policy: ProcessedPolicy): CodeBlock {
+        return if (policy.capabilities.isEmpty()) {
+            CodeBlock.of("emptySet()")
+        } else {
+            val capabilityRefs = policy.capabilities.joinToString(",\n    ") { cap ->
+                "%T.${cap.name}"
+            }
+            val args = policy.capabilities.map {
+                ClassName.bestGuess(PolicyCapability::class.qualifiedName!!)
+            }.toTypedArray()
+            CodeBlock.builder()
+                .add("setOf(\n    $capabilityRefs\n)", *args)
+                .build()
+        }
     }
 
     private fun buildHandlerInitializer(policy: ProcessedPolicy): CodeBlock {
