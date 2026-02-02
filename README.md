@@ -62,7 +62,10 @@ Policy framework for managing Knox policies:
 
 - **Policy API** - Interfaces for defining policies (`PolicyComponent`, `PolicyContract`, `PolicyDescriptor`)
 - **Policy State** - State management (`PolicyState`, `BooleanPolicyState`, `ConfigurableStatePolicy`)
-- **Policy Registry** - Registration and lookup (`DefaultPolicyRegistry`, `CachedPolicyRegistry`)
+- **Policy Registry** - Registration and lookup with multi-dimensional indexing (`DefaultPolicyRegistry`, `CachedPolicyRegistry`)
+- **Policy Capabilities** - Device-centric metadata (`PolicyCapability`) for filtering and categorization
+- **Grouping Strategies** - Customer-extensible grouping (`PolicyGroupingStrategy`, `CapabilityBasedGroupingStrategy`)
+- **UI Conversion** - Polymorphic UI state conversion (`PolicyUiConverter`)
 - **Annotations** - `@PolicyDefinition` for code generation
 
 ### feature-processor
@@ -181,6 +184,99 @@ val registry: PolicyRegistry = DefaultPolicyRegistry()
 registry.register(ScreenBrightnessPolicy())
 
 val policy = registry.getPolicy<ScreenBrightnessPolicy>("screen_brightness")
+```
+
+### Policy Capabilities
+
+Policies can declare intrinsic capabilities that describe what they modify and their requirements:
+
+```kotlin
+@PolicyDefinition(
+    title = "5G Band Locking",
+    description = "Lock device to specific 5G bands",
+    category = PolicyCategory.ConfigurableToggle,
+    capabilities = [
+        PolicyCapability.MODIFIES_RADIO,
+        PolicyCapability.REQUIRES_SIM,
+        PolicyCapability.AFFECTS_CONNECTIVITY
+    ]
+)
+class BandLocking5gPolicy : ConfigurableStatePolicy<BandLockingState>() { ... }
+```
+
+Available capabilities:
+
+| Category | Capabilities |
+|----------|-------------|
+| Modifies | `MODIFIES_RADIO`, `MODIFIES_WIFI`, `MODIFIES_BLUETOOTH`, `MODIFIES_DISPLAY`, `MODIFIES_AUDIO`, `MODIFIES_CHARGING`, `MODIFIES_CALLING`, `MODIFIES_HARDWARE`, `MODIFIES_SECURITY`, `MODIFIES_NETWORK` |
+| Requirements | `REQUIRES_SIM`, `REQUIRES_HDM`, `REQUIRES_DUAL_SIM` |
+| Impact | `SECURITY_SENSITIVE`, `AFFECTS_CONNECTIVITY`, `AFFECTS_BATTERY`, `REQUIRES_REBOOT` |
+| Reversibility | `EASILY_REVERSIBLE`, `PERSISTENT_ACROSS_REBOOT` |
+
+### Multi-Dimensional Policy Queries
+
+The registry supports efficient capability-based lookups with O(1) indexing:
+
+```kotlin
+// Find all policies that modify radio settings
+val radioPolicies = registry.getByCapability(PolicyCapability.MODIFIES_RADIO)
+
+// Find policies with ANY of the capabilities
+val connectivityPolicies = registry.getByCapabilities(
+    setOf(PolicyCapability.MODIFIES_RADIO, PolicyCapability.MODIFIES_WIFI),
+    matchAll = false
+)
+
+// Find policies with ALL capabilities
+val radioSimPolicies = registry.getByCapabilities(
+    setOf(PolicyCapability.MODIFIES_RADIO, PolicyCapability.REQUIRES_SIM),
+    matchAll = true
+)
+
+// Combined query with category and capabilities
+val toggleRadioPolicies = registry.query(
+    category = PolicyCategory.Toggle,
+    capabilities = setOf(PolicyCapability.MODIFIES_RADIO)
+)
+```
+
+### Policy Grouping Strategies
+
+Grouping strategies allow customers to define how policies are organized in the UI without modifying policy definitions:
+
+```kotlin
+// Default: Group by primary capability
+val strategy = CapabilityBasedGroupingStrategy()
+val groups = strategy.resolveAllGroups(registry)
+// Returns: Radio & Cellular, Wi-Fi, Display, etc.
+
+// Custom: Define your own groups
+val customStrategy = ConfigurableGroupingStrategy(
+    GroupingConfiguration.builder()
+        .addGroup("quick", "Quick Toggles", sortOrder = 1)
+        .addGroup("radio", "Radio Settings", sortOrder = 2)
+        .addGroup("advanced", "Advanced", sortOrder = 3)
+        .assignPolicies("quick", "tactical_device_mode", "night_vision_mode")
+        .assignPolicies("radio", "band_locking_5g", "band_locking_lte", "nr_mode")
+        .assignPolicies("advanced", "enable_hdm", "disable_ims")
+        .build()
+)
+```
+
+With Hilt, inject a grouping strategy:
+
+```kotlin
+@HiltViewModel
+class PoliciesViewModel @Inject constructor(
+    private val registry: PolicyRegistry,
+    private val groupingStrategy: PolicyGroupingStrategy
+) : ViewModel() {
+
+    fun loadGroupedPolicies() {
+        val groups = groupingStrategy.resolveAllGroups(registry)
+        // groups: List<ResolvedPolicyGroup>
+    }
+}
 ```
 
 ### Using Resource Provider
