@@ -1,9 +1,11 @@
+import com.android.build.api.dsl.LibraryExtension
+
 plugins {
     alias(libs.plugins.convention.android.library)
     alias(libs.plugins.convention.android.library.compose)
 }
 
-android {
+extensions.configure<LibraryExtension> {
     defaultConfig {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

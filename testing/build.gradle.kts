@@ -1,10 +1,12 @@
+import com.android.build.api.dsl.LibraryExtension
+
 plugins {
     alias(libs.plugins.convention.android.library)
     alias(libs.plugins.convention.android.library.compose)
     alias(libs.plugins.convention.android.hilt)
 }
 
-android {
+extensions.configure<LibraryExtension> {
     namespace = "net.sfelabs.knox.core.testing"
 }
 

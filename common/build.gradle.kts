@@ -1,12 +1,12 @@
+import com.android.build.api.dsl.LibraryExtension
+
 plugins {
     alias(libs.plugins.convention.android.library)
     alias(libs.plugins.convention.android.library.compose)
     alias(libs.plugins.convention.android.hilt)
-    //id("dagger.hilt.android.plugin")
-    //id("kotlin-kapt")
 }
 
-android {
+extensions.configure<LibraryExtension> {
     namespace = "net.sfelabs.knox.core.common"
 }
 
