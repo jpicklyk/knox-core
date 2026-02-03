@@ -11,8 +11,8 @@ import net.sfelabs.knox.core.feature.api.PolicyCategory
 import net.sfelabs.knox.core.feature.api.PolicyState
 import net.sfelabs.knox.core.feature.processor.generator.ComponentGenerator
 import net.sfelabs.knox.core.feature.processor.generator.KeyGenerator
-import net.sfelabs.knox.core.feature.processor.generator.ModuleGenerator
 import net.sfelabs.knox.core.feature.processor.generator.PolicyTypeGenerator
+import net.sfelabs.knox.core.feature.processor.generator.RegistryGenerator
 import net.sfelabs.knox.core.feature.processor.model.ProcessedPolicy
 
 
@@ -28,7 +28,7 @@ class PolicyDefinitionProcessor(
         if (featureClasses.isNotEmpty()) {
             ComponentGenerator(environment).generate(featureClasses)
             KeyGenerator(environment).generate(featureClasses)
-            ModuleGenerator(environment).generate(featureClasses)
+            RegistryGenerator(environment).generate(featureClasses)
             PolicyTypeGenerator(environment).generate(featureClasses)
         }
 
