@@ -110,5 +110,10 @@ enum class PolicyCapability {
     EASILY_REVERSIBLE,
 
     /** Policy settings persist across device reboot */
-    PERSISTENT_ACROSS_REBOOT
+    PERSISTENT_ACROSS_REBOOT,
+
+    // Compliance frameworks
+
+    /** Policy is relevant to STIG (Security Technical Implementation Guide) compliance */
+    STIG
 }
