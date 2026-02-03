@@ -171,7 +171,8 @@ class PolicyCapabilityTest {
             "AFFECTS_BATTERY",
             "REQUIRES_REBOOT",
             "EASILY_REVERSIBLE",
-            "PERSISTENT_ACROSS_REBOOT"
+            "PERSISTENT_ACROSS_REBOOT",
+            "STIG"
         )
 
         val actualCapabilities = PolicyCapability.entries.map { it.name }.toSet()
