@@ -72,6 +72,38 @@ Policy framework for managing Knox policies:
 
 KSP annotation processor that generates policy boilerplate from `@PolicyDefinition` annotations.
 
+**Generated artifacts:**
+
+| Artifact | Description |
+|----------|-------------|
+| `*Component` | `PolicyComponent<T>` implementation wrapping the policy |
+| `*Key` | Singleton `PolicyKey<T>` for type-safe policy lookup |
+| `PolicyType` | Sealed interface with all policy types for exhaustive matching |
+| `PolicyExtensions` | Type-safe extension functions for policy casting |
+| `GeneratedPolicyComponents` | DI-agnostic registry listing all components |
+
+The `GeneratedPolicyComponents` object provides a simple `getAll()` function that returns all policy components. This allows DI frameworks (Hilt, Koin, etc.) to consume the components without the policy module having any DI dependencies:
+
+```kotlin
+// Generated - no DI framework imports
+object GeneratedPolicyComponents {
+    fun getAll(): List<PolicyComponent<out PolicyState>> = listOf(
+        Policy1Component(),
+        Policy2Component(),
+        // ...
+    )
+}
+```
+
+DI integration modules (like knox-hilt) then provide the binding:
+
+```kotlin
+// In knox-hilt
+@Provides @ElementsIntoSet
+fun providePolicies(): Set<PolicyComponent<out PolicyState>> =
+    GeneratedPolicyComponents.getAll().toSet()
+```
+
 ### testing
 
 Test utilities and helpers:
