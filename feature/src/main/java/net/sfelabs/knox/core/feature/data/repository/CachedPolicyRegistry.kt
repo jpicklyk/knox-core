@@ -53,15 +53,54 @@ class CachedPolicyRegistry(private val delegate: DefaultPolicyRegistry) : Policy
         return mutex.withLock {
             getHandler(policyKey)?.setState(state)?.also { result ->
                 if (result is ApiResult.Success) {
-                    val cachedFeature = cache[policyKey.policyName]
-                    if (cachedFeature != null) {
-                        cache[policyKey.policyName] = Policy(
-                            key = cachedFeature.key,
-                            state = PolicyStateWrapper(state)
-                        )
-                    }
+                    // Invalidate cache entry so next getPolicyState fetches fresh from device.
+                    // We cannot cache the input state because it may be missing device-derived
+                    // fields (e.g., HdmState.supportedMask) that are only populated by getState().
+                    cache.remove(policyKey.policyName)
                 }
             } ?: ApiResult.Error(DefaultApiError.UnexpectedError("Policy handler not found"))
+        }
+    }
+
+    override suspend fun <T : PolicyState> setAndRefreshPolicyState(
+        policyKey: PolicyKey<T>,
+        state: T
+    ): ApiResult<Policy<T>> = mutex.withLock {
+        // 1. Set the state
+        val setResult = getHandler(policyKey)?.setState(state)
+            ?: return@withLock ApiResult.Error(
+                DefaultApiError.UnexpectedError("Policy handler not found")
+            )
+
+        if (setResult is ApiResult.Error) {
+            return@withLock ApiResult.Error(setResult.apiError, setResult.exception)
+        }
+        if (setResult is ApiResult.NotSupported) {
+            return@withLock ApiResult.NotSupported
+        }
+
+        // 2. Refresh from device to get complete state including device-derived fields
+        val handler = getHandler(policyKey)
+            ?: return@withLock ApiResult.Error(
+                DefaultApiError.UnexpectedError("Policy handler not found after successful set")
+            )
+
+        return@withLock try {
+            val refreshedState = handler.getState()
+            @Suppress("UNCHECKED_CAST")
+            val policy = Policy(policyKey, PolicyStateWrapper(refreshedState as T))
+
+            // 3. Update cache with the complete refreshed state
+            cache[policyKey.policyName] = policy as Policy<PolicyState>
+
+            ApiResult.Success(policy)
+        } catch (e: Exception) {
+            // Clear stale cache entry on refresh failure
+            cache.remove(policyKey.policyName)
+            ApiResult.Error(
+                DefaultApiError.UnexpectedError("Policy set succeeded but refresh failed: ${e.message}"),
+                e
+            )
         }
     }
 

@@ -103,6 +103,40 @@ class DefaultPolicyRegistry : PolicyRegistry {
             ?: ApiResult.Error(DefaultApiError.UnexpectedError("Policy handler not found"))
     }
 
+    override suspend fun <T : PolicyState> setAndRefreshPolicyState(
+        policyKey: PolicyKey<T>,
+        state: T
+    ): ApiResult<Policy<T>> {
+        // 1. Set the state
+        val setResult = setPolicyState(policyKey, state)
+
+        if (setResult is ApiResult.Error) {
+            return ApiResult.Error(setResult.apiError, setResult.exception)
+        }
+        if (setResult is ApiResult.NotSupported) {
+            return ApiResult.NotSupported
+        }
+
+        // 2. Refresh from device to get complete state including device-derived fields
+        val handler = getHandler(policyKey)
+            ?: return ApiResult.Error(
+                DefaultApiError.UnexpectedError("Policy handler not found after successful set")
+            )
+
+        return try {
+            val refreshedState = handler.getState()
+            @Suppress("UNCHECKED_CAST")
+            ApiResult.Success(
+                Policy(policyKey, PolicyStateWrapper(refreshedState as T))
+            )
+        } catch (e: Exception) {
+            ApiResult.Error(
+                DefaultApiError.UnexpectedError("Policy set succeeded but refresh failed: ${e.message}"),
+                e
+            )
+        }
+    }
+
     // Capability-based query implementations
 
     override fun getByCapability(capability: PolicyCapability): List<PolicyComponent<out PolicyState>> {
