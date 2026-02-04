@@ -7,7 +7,8 @@ sealed interface ConfigurationOption {
     data class Toggle(
         override val key: String,
         override val label: String,
-        val isEnabled: Boolean
+        val isEnabled: Boolean,
+        val isSupported: Boolean = true
     ) : ConfigurationOption
 
     data class Choice(

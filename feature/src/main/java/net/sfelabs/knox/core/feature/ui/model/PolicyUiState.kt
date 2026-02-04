@@ -22,7 +22,7 @@ sealed class PolicyUiState {
         override val error: String? = null,
     ) : PolicyUiState() {
         override fun copyWithError(error: String?) = copy(isLoading = false, error = error)
-        override fun copyWithLoading(isLoading: Boolean) = copy(isLoading = isLoading)
+        override fun copyWithLoading(isLoading: Boolean) = copy(isLoading = isLoading, error = null)
     }
 
     data class ConfigurableToggle(
@@ -36,7 +36,7 @@ sealed class PolicyUiState {
         val configurationOptions: List<ConfigurationOption>
     ) : PolicyUiState() {
         override fun copyWithError(error: String?) = copy(isLoading = false, error = error)
-        override fun copyWithLoading(isLoading: Boolean) = copy(isLoading = isLoading)
+        override fun copyWithLoading(isLoading: Boolean) = copy(isLoading = isLoading, error = null)
     }
 
     fun currentOptions(): List<ConfigurationOption> {
