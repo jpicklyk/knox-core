@@ -61,17 +61,23 @@ class CapabilityBasedGroupingStrategy : PolicyGroupingStrategy {
             description = "Policies that modify hardware components",
             sortOrder = 8
         ),
+        PolicyCapability.MODIFIES_BROWSER to PolicyGroup(
+            id = "browser",
+            displayName = "Browser",
+            description = "Policies that modify Samsung Internet browser settings",
+            sortOrder = 9
+        ),
         PolicyCapability.MODIFIES_SECURITY to PolicyGroup(
             id = "security",
             displayName = "Security",
             description = "Policies that modify security settings",
-            sortOrder = 9
+            sortOrder = 10
         ),
         PolicyCapability.MODIFIES_NETWORK to PolicyGroup(
             id = "network",
             displayName = "Network",
             description = "Policies that modify general network settings",
-            sortOrder = 10
+            sortOrder = 11
         )
     )
 

@@ -79,6 +79,9 @@ enum class PolicyCapability {
     /** Policy modifies general network settings */
     MODIFIES_NETWORK,
 
+    /** Policy modifies browser settings (Samsung Internet) */
+    MODIFIES_BROWSER,
+
     // Device requirements
 
     /** Policy requires a SIM card to be present */
@@ -103,11 +106,6 @@ enum class PolicyCapability {
 
     /** Policy requires device reboot to take effect */
     REQUIRES_REBOOT,
-
-    // Reversibility
-
-    /** Policy can be easily reversed without side effects */
-    EASILY_REVERSIBLE,
 
     /** Policy settings persist across device reboot */
     PERSISTENT_ACROSS_REBOOT,

@@ -91,7 +91,7 @@ class RegistryCapabilityQueryTest {
         displayPolicy = createTestComponent(
             "night_vision",
             PolicyCategory.Toggle,
-            setOf(PolicyCapability.MODIFIES_DISPLAY, PolicyCapability.EASILY_REVERSIBLE)
+            setOf(PolicyCapability.MODIFIES_DISPLAY)
         )
 
         multiCapabilityPolicy = createTestComponent(

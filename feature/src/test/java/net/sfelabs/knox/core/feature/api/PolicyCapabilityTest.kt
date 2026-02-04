@@ -161,6 +161,7 @@ class PolicyCapabilityTest {
             "MODIFIES_CHARGING",
             "MODIFIES_CALLING",
             "MODIFIES_HARDWARE",
+            "MODIFIES_BROWSER",
             "MODIFIES_SECURITY",
             "MODIFIES_NETWORK",
             "REQUIRES_SIM",
@@ -170,7 +171,6 @@ class PolicyCapabilityTest {
             "AFFECTS_CONNECTIVITY",
             "AFFECTS_BATTERY",
             "REQUIRES_REBOOT",
-            "EASILY_REVERSIBLE",
             "PERSISTENT_ACROSS_REBOOT",
             "STIG"
         )

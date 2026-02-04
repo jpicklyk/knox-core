@@ -106,7 +106,7 @@ class CapabilityBasedGroupingStrategyTest {
     fun `getGroupForPolicy returns correct group for policy with MODIFIES_DISPLAY`() {
         val component = createTestComponent(
             "night_vision_mode",
-            setOf(PolicyCapability.MODIFIES_DISPLAY, PolicyCapability.EASILY_REVERSIBLE)
+            setOf(PolicyCapability.MODIFIES_DISPLAY)
         )
 
         val group = strategy.getGroupForPolicy(component)
@@ -223,6 +223,7 @@ class CapabilityBasedGroupingStrategyTest {
         every { mockRegistry.getByCapability(PolicyCapability.MODIFIES_CHARGING) } returns emptyList()
         every { mockRegistry.getByCapability(PolicyCapability.MODIFIES_CALLING) } returns emptyList()
         every { mockRegistry.getByCapability(PolicyCapability.MODIFIES_HARDWARE) } returns emptyList()
+        every { mockRegistry.getByCapability(PolicyCapability.MODIFIES_BROWSER) } returns emptyList()
         every { mockRegistry.getByCapability(PolicyCapability.MODIFIES_SECURITY) } returns emptyList()
         every { mockRegistry.getByCapability(PolicyCapability.MODIFIES_NETWORK) } returns emptyList()
         every { mockRegistry.getAllComponents() } returns listOf(radioPolicy, displayPolicy, otherPolicy)
@@ -259,6 +260,7 @@ class CapabilityBasedGroupingStrategyTest {
         every { mockRegistry.getByCapability(PolicyCapability.MODIFIES_CHARGING) } returns emptyList()
         every { mockRegistry.getByCapability(PolicyCapability.MODIFIES_CALLING) } returns emptyList()
         every { mockRegistry.getByCapability(PolicyCapability.MODIFIES_HARDWARE) } returns emptyList()
+        every { mockRegistry.getByCapability(PolicyCapability.MODIFIES_BROWSER) } returns emptyList()
         every { mockRegistry.getByCapability(PolicyCapability.MODIFIES_SECURITY) } returns emptyList()
         every { mockRegistry.getByCapability(PolicyCapability.MODIFIES_NETWORK) } returns emptyList()
         every { mockRegistry.getAllComponents() } returns listOf(radioPolicy)
@@ -285,13 +287,14 @@ class CapabilityBasedGroupingStrategyTest {
         every { mockRegistry.getByCapability(PolicyCapability.MODIFIES_CHARGING) } returns emptyList()
         every { mockRegistry.getByCapability(PolicyCapability.MODIFIES_CALLING) } returns emptyList()
         every { mockRegistry.getByCapability(PolicyCapability.MODIFIES_HARDWARE) } returns emptyList()
+        every { mockRegistry.getByCapability(PolicyCapability.MODIFIES_BROWSER) } returns emptyList()
         every { mockRegistry.getByCapability(PolicyCapability.MODIFIES_SECURITY) } returns emptyList()
         every { mockRegistry.getByCapability(PolicyCapability.MODIFIES_NETWORK) } returns emptyList()
         every { mockRegistry.getAllComponents() } returns listOf(radioPolicy)
 
         val resolvedGroups = strategy.resolveAllGroups(mockRegistry, includeEmpty = true)
 
-        // All groups should be present (11 total)
-        assertEquals(11, resolvedGroups.size)
+        // All groups should be present (12 total)
+        assertEquals(12, resolvedGroups.size)
     }
 }
