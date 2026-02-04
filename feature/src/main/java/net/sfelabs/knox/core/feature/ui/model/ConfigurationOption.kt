@@ -23,4 +23,19 @@ sealed interface ConfigurationOption {
         val value: Int,
         val range: IntRange? = null
     ) : ConfigurationOption
+
+    data class TextInput(
+        override val key: String,
+        override val label: String,
+        val value: String,
+        val hint: String? = null,
+        val maxLength: Int? = null
+    ) : ConfigurationOption
+
+    data class TextList(
+        override val key: String,
+        override val label: String,
+        val values: Set<String>,
+        val hint: String? = null
+    ) : ConfigurationOption
 }
