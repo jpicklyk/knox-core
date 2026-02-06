@@ -16,7 +16,7 @@ import net.sfelabs.knox.core.common.data.datasource.DataStoreSource
  * ### With Hilt (recommended for apps)
  * Inject [PreferencesRepository] directly - the knox-hilt module provides it as a singleton.
  *
- * ### Without Hilt (for libraries like knox-tactical)
+ * ### Without Hilt (for standalone libraries)
  * Use [getInstance] which returns the singleton instance. The instance must be
  * initialized first either by:
  * - Calling [getInstance] with a Context (creates default implementation)

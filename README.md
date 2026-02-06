@@ -288,7 +288,7 @@ val customStrategy = ConfigurableGroupingStrategy(
         .addGroup("quick", "Quick Toggles", sortOrder = 1)
         .addGroup("radio", "Radio Settings", sortOrder = 2)
         .addGroup("advanced", "Advanced", sortOrder = 3)
-        .assignPolicies("quick", "tactical_device_mode", "night_vision_mode")
+        .assignPolicies("quick", "device_lock_mode", "screen_brightness")
         .assignPolicies("radio", "band_locking_5g", "band_locking_lte", "nr_mode")
         .assignPolicies("advanced", "enable_hdm", "disable_ims")
         .build()

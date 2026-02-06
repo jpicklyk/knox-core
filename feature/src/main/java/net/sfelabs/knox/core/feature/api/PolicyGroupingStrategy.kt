@@ -20,7 +20,7 @@ import net.sfelabs.knox.core.feature.domain.registry.PolicyRegistry
  *     )
  *
  *     private val groupMappings = mapOf(
- *         "quick" to setOf("tactical_device_mode", "enable_night_vision_mode"),
+ *         "quick" to setOf("device_lock_mode", "screen_brightness"),
  *         "radio" to setOf("band_locking_5g", "band_locking_lte", "nr_mode"),
  *         "advanced" to setOf("enable_hdm", "disable_ims")
  *     )
