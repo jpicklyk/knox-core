@@ -14,7 +14,7 @@ import androidx.compose.ui.tooling.preview.Preview
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TacticalTopAppBar(
+fun KnoxTopAppBar(
     @StringRes titleResource: Int,
     modifier: Modifier = Modifier,
     colors: TopAppBarColors = TopAppBarDefaults.centerAlignedTopAppBarColors(),
@@ -28,8 +28,8 @@ fun TacticalTopAppBar(
 @OptIn(ExperimentalMaterial3Api::class)
 @Preview
 @Composable
-private fun TacticalTopAppBarPreview() {
-    TacticalTopAppBar(
+private fun KnoxTopAppBarPreview() {
+    KnoxTopAppBar(
         titleResource = R.string.untitled
     )
 }
