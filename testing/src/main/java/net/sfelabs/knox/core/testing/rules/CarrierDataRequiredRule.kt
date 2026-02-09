@@ -23,7 +23,7 @@ class CarrierDataRequiredRule : TestRule {
                     description.testClass?.getAnnotation(CarrierDataRequired::class.java) != null
 
                 if (hasAnnotation) {
-                    Assume.assumeTrue("Carrier data connection is not available", isCarrierDataConnected())
+                    Assume.assumeTrue("Skipping test since carrier data connection is not available", isCarrierDataConnected())
                 }
                 statement.evaluate()
             }

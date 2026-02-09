@@ -19,7 +19,7 @@ class EthernetNotConnectedRule : TestRule {
         return object : Statement() {
             override fun evaluate() {
                 if (description.getAnnotation(EthernetNotConnected::class.java) != null) {
-                    Assume.assumeTrue("Ethernet connection should not be connected", !isEthernetConnected())
+                    Assume.assumeTrue("Skipping test since ethernet is connected", !isEthernetConnected())
                 }
                 statement.evaluate()
             }

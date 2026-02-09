@@ -23,7 +23,7 @@ class EthernetRequiredRule : TestRule {
                     description.testClass?.getAnnotation(EthernetRequired::class.java) != null
 
                 if (hasAnnotation) {
-                    Assume.assumeTrue("Ethernet connection is not available", isEthernetConnected())
+                    Assume.assumeTrue("Skipping test since ethernet connection is not available", isEthernetConnected())
                 }
                 statement.evaluate()
             }

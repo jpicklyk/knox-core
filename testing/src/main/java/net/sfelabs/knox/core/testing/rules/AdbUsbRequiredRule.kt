@@ -43,7 +43,7 @@ class AdbUsbRequiredRule : TestRule {
                     description.testClass?.getAnnotation(AdbUsbRequired::class.java) != null
 
                 if (hasAnnotation) {
-                    Assume.assumeTrue("ADB is not connected via USB", isAdbUsbConnected())
+                    Assume.assumeTrue("Skipping test since ADB is not connected via USB", isAdbUsbConnected())
                 }
                 statement.evaluate()
             }

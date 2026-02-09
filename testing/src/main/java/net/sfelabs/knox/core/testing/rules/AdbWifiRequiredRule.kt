@@ -43,7 +43,7 @@ class AdbWifiRequiredRule : TestRule {
                     description.testClass?.getAnnotation(AdbWifiRequired::class.java) != null
 
                 if (hasAnnotation) {
-                    Assume.assumeTrue("ADB is not connected via WiFi", isAdbWifiConnected())
+                    Assume.assumeTrue("Skipping test since ADB is not connected via WiFi", isAdbWifiConnected())
                 }
                 statement.evaluate()
             }

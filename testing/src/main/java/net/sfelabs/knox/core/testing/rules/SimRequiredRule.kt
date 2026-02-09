@@ -24,7 +24,7 @@ class SimRequiredRule : TestRule {
                     description.testClass?.getAnnotation(SimRequired::class.java) != null
 
                 if (hasAnnotation) {
-                    Assume.assumeTrue("SIM card is not present", isSimCardPresent(ApplicationProvider.getApplicationContext()))
+                    Assume.assumeTrue("Skipping test since SIM card is not present", isSimCardPresent(ApplicationProvider.getApplicationContext()))
                 }
                 statement.evaluate()
             }
