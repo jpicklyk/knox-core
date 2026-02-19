@@ -8,7 +8,7 @@ sealed class UiText {
     }
 
     class StringResource(
-        @androidx.annotation.StringRes val resId: Int,
+        @param:androidx.annotation.StringRes val resId: Int,
         vararg val args: Any,
         private val fallbackString: String? = null
     ) : UiText() {
