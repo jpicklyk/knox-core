@@ -2,22 +2,14 @@ package net.sfelabs.knox.core.common.domain
 
 import android.annotation.SuppressLint
 import android.os.Build
-import net.sfelabs.knox.core.common.UiText
 import net.sfelabs.knox.core.domain.usecase.model.ApiResult
 import java.lang.reflect.Method
 
-typealias UnitResource = Resource<Unit>
 typealias UnitApiCall = ApiResult<Unit>
 
 /**
  * Utility package for various Android helper functions.
  */
-
-sealed class Resource<T>(val data: T? = null, val uiText: UiText? = null) {
-    class Loading<T>(data: T? = null): Resource<T>(data)
-    class Success<T>(data: T? = null): Resource<T>(data)
-    class Error<T>(data: T? = null, uiText: UiText): Resource<T>(data, uiText)
-}
 
 fun getCallerClassName(clazz: Class<*>): String? {
     val stackTrace = Thread.currentThread().stackTrace
