@@ -110,15 +110,6 @@ abstract class SuspendingUseCase<in P, out R : Any>(
      * @param throwable The throwable to be mapped.
      * @return An [ApiResult] representing the error state.
      */
-    protected open fun mapError(throwable: Throwable): ApiResult<R> = when (throwable) {
-        is NoSuchMethodError -> ApiResult.NotSupported
-        is SecurityException -> ApiResult.Error(
-            apiError = DefaultApiError.PermissionError("Permission error: ${throwable.message}"),
-            exception = throwable
-        )
-        else -> ApiResult.Error(
-            apiError = DefaultApiError.UnexpectedError(),
-            exception = Exception(throwable)
-        )
-    }
+    protected open fun mapError(throwable: Throwable): ApiResult<R> =
+        mapThrowableToApiResult(throwable)
 }
