@@ -14,7 +14,7 @@ dependencies {
     implementation(libs.androidx.collections)
     implementation(libs.kotlinx.coroutines.android)
     //implementation(libs.jackson.module)
-    implementation(projects.knoxCore.usecaseExecutor)
+    api(projects.knoxCore.usecaseExecutor)
     implementation(projects.knoxCore.android)
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.material3)

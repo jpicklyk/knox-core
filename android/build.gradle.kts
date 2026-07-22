@@ -10,10 +10,7 @@ extensions.configure<LibraryExtension> {
 }
 
 dependencies {
-    implementation(projects.knoxCore.usecaseExecutor)
     implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.appcompat)
-    implementation(libs.material)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.test.junit)
     androidTestImplementation(libs.androidx.test.espresso.core)

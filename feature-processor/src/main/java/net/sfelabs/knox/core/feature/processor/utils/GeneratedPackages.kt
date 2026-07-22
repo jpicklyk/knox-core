@@ -10,7 +10,4 @@ object GeneratedPackages {
 
     fun getPolicyPackage(environment: SymbolProcessorEnvironment): String =
         "${getNamespace(environment)}.generated.policy"
-
-    fun getDiPackage(environment: SymbolProcessorEnvironment): String =
-        "${getNamespace(environment)}.generated.di"
 }

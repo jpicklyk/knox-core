@@ -51,22 +51,6 @@ class PolicyDefinitionProcessor(
         return null
     }
 
-    private fun findConfigurableType(classDeclaration: KSClassDeclaration): KSType? {
-        for (superType in classDeclaration.superTypes) {
-//            val qualifiedName = superType.resolve().declaration.qualifiedName?.asString()
-//
-//            if (qualifiedName == ConfigurablePolicy::class.qualifiedName) {
-//                return superType.resolve()
-//            }
-
-            val superDecl = superType.resolve().declaration as? KSClassDeclaration
-            if (superDecl != null) {
-                findConfigurableType(superDecl)?.let { return it }
-            }
-        }
-        return null
-    }
-
     private fun processFeatureDefinition(
         classDeclaration: KSClassDeclaration
     ): ProcessedPolicy? {
@@ -94,11 +78,6 @@ class PolicyDefinitionProcessor(
             }
             else -> contractType.arguments.firstOrNull()?.type?.resolve() ?: return null
         }
-
-        val configurableType = findConfigurableType(classDeclaration)
-
-        // Get configuration type from ConfigurablePolicy if it exists
-        val configType = configurableType?.arguments?.get(1)?.type?.resolve()
 
         // Verify PolicyState implementation
         val hasPolicyStateInterface = when {
@@ -173,7 +152,6 @@ class PolicyDefinitionProcessor(
             category = category,
             capabilities = capabilities,
             valueType = valueType,
-            configType = configType,
             declaration = classDeclaration
         )
     }

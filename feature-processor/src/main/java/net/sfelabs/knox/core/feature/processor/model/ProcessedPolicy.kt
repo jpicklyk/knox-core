@@ -13,6 +13,5 @@ data class ProcessedPolicy(
     val category: PolicyCategory,
     val capabilities: Set<PolicyCapability>,
     val valueType: KSType,
-    val configType: KSType?,
     val declaration: KSClassDeclaration
 )
