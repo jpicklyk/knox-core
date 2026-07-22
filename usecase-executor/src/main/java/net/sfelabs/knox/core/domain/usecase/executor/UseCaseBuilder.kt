@@ -214,6 +214,10 @@ class UseCaseBuilder {
         private var timeoutDuration: Duration? = null
         private var retryPolicy: RetryPolicy? = null
         private var stateListener: ((UseCaseBuilderState) -> Unit)? = null
+
+        // Guards results/executedOperations and serializes state-listener callbacks:
+        // parallel groups mutate them from multiple coroutines on Dispatchers.IO.
+        private val stateLock = Any()
         private val executedOperations = mutableListOf<ExecutedOperation>()
         private val results = mutableListOf<ApiResult<*>>()
 
@@ -231,14 +235,17 @@ class UseCaseBuilder {
         }
 
         private fun notifyStateChanged() {
-            val currentExecutedOperations = executedOperations.toList()
-            val currentResults = results.toList()
+            val listener = stateListener ?: return
+            synchronized(stateLock) {
+                val currentExecutedOperations = executedOperations.toList()
+                val currentResults = results.toList()
 
-            val state = object : UseCaseBuilderState {
-                override val executedOperations: List<ExecutedOperation> = currentExecutedOperations
-                override val currentResults: List<ApiResult<*>> = currentResults
+                val state = object : UseCaseBuilderState {
+                    override val executedOperations: List<ExecutedOperation> = currentExecutedOperations
+                    override val currentResults: List<ApiResult<*>> = currentResults
+                }
+                listener.invoke(state)
             }
-            stateListener?.invoke(state)
         }
 
         fun add(operation: suspend () -> ApiResult<*>): Builder {
@@ -342,34 +349,33 @@ class UseCaseBuilder {
         private suspend fun executeSingleOperation(
             operation: ExecutionUnit.SingleOperation
         ): ApiResult<*> {
-            // First add the result to our results list
-            fun addResult(result: ApiResult<*>) {
-                results.add(result)
-                executedOperations.add(ExecutedOperation(
-                    id = operation.hashCode().toString(),
-                    timestamp = System.currentTimeMillis(),
-                    wasSuccessful = result is ApiResult.Success,
-                    skipped = false
-                ))
+            // Records the result and returns its index in [results] so the fallback
+            // path can replace the correct slot even when other operations append
+            // concurrently from a parallel group.
+            fun recordResult(result: ApiResult<*>, skipped: Boolean): Int {
+                val index = synchronized(stateLock) {
+                    results.add(result)
+                    executedOperations.add(ExecutedOperation(
+                        id = operation.hashCode().toString(),
+                        timestamp = System.currentTimeMillis(),
+                        wasSuccessful = result is ApiResult.Success,
+                        skipped = skipped
+                    ))
+                    results.lastIndex
+                }
                 notifyStateChanged()
+                return index
             }
 
             // Check predicate if exists
             if (operation.predicate?.invoke() == false) {
                 val result = ApiResult.Success(Unit)
-                results.add(result)
-                executedOperations.add(ExecutedOperation(
-                    id = operation.hashCode().toString(),
-                    timestamp = System.currentTimeMillis(),
-                    wasSuccessful = true,
-                    skipped = true
-                ))
-                notifyStateChanged()
+                recordResult(result, skipped = true)
                 return result
             }
 
             val result = executeWithRetry(operation)
-            addResult(result)  // Add result and notify
+            val resultIndex = recordResult(result, skipped = false)
 
             // Handle errors if handler exists
             if (result is ApiResult.Error) {
@@ -380,14 +386,15 @@ class UseCaseBuilder {
             return when {
                 result !is ApiResult.Success && operation.fallback != null -> {
                     val fallbackResult = operation.fallback.invoke()
-                    // Track fallback execution
-                    executedOperations.add(ExecutedOperation(
-                        id = "${operation.hashCode()}_fallback",
-                        timestamp = System.currentTimeMillis(),
-                        wasSuccessful = fallbackResult is ApiResult.Success,
-                        skipped = false
-                    ))
-                    results[results.lastIndex] = fallbackResult  // Replace the previous result
+                    synchronized(stateLock) {
+                        executedOperations.add(ExecutedOperation(
+                            id = "${operation.hashCode()}_fallback",
+                            timestamp = System.currentTimeMillis(),
+                            wasSuccessful = fallbackResult is ApiResult.Success,
+                            skipped = false
+                        ))
+                        results[resultIndex] = fallbackResult  // Replace this operation's result
+                    }
                     notifyStateChanged()
                     fallbackResult
                 }

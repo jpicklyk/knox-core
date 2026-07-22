@@ -14,6 +14,7 @@ import net.sfelabs.knox.core.domain.usecase.MainCoroutineRule
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -328,11 +329,12 @@ class UseCaseBuilderTest {
     fun `state tracking in parallel execution`() = runTest {
         // Given
         val states = mutableListOf<UseCaseBuilderState>()
-        var executionCount = 0
+        // Parallel operations run on real dispatcher threads, so the counter must be atomic
+        val executionCount = AtomicInteger(0)
 
         // When
         builder.parallel {
-            executionCount++
+            executionCount.incrementAndGet()
             ApiResult.Success(1)
         }
             .onStateChanged { state ->
@@ -340,17 +342,17 @@ class UseCaseBuilderTest {
                 states.add(state)
             }
             .add {
-                executionCount++
+                executionCount.incrementAndGet()
                 ApiResult.Success(2)
             }
             .execute()
 
         // Then
-        println("Execution count: $executionCount")
+        println("Execution count: ${executionCount.get()}")
         println("States size: ${states.size}")
         println("Last state operations: ${states.lastOrNull()?.executedOperations?.size}")
 
-        assertEquals(2, executionCount)
+        assertEquals(2, executionCount.get())
         assertTrue("Should have received state updates", states.isNotEmpty())
         assertEquals("Should have tracked both operations",
             2, states.last().executedOperations.size)
