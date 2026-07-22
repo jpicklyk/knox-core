@@ -3,9 +3,7 @@ package net.sfelabs.knox.core.domain.usecase.model
 sealed class ApiResult<out T : Any> {
     data class Success<out T : Any>(val data: T): ApiResult<T>()
     data class Error(
-        //TODO - Refactor code to get rid of UiText and replace with mandatory ApiError
-        //val uiText: UiText,
-        val apiError: ApiError = DefaultApiError.UnexpectedError(),
+        val apiError: ApiError,
         val exception: Exception? = null
     ): ApiResult<Nothing>()
     data object NotSupported: ApiResult<Nothing>()
