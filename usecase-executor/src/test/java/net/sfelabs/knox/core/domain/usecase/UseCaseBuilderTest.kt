@@ -1,15 +1,16 @@
 import junit.framework.TestCase.assertEquals
+import junit.framework.TestCase.assertFalse
 import junit.framework.TestCase.assertTrue
-import kotlinx.coroutines.CoroutineScope
+import junit.framework.TestCase.fail
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
 import net.sfelabs.knox.core.domain.usecase.model.ApiResult
 import net.sfelabs.knox.core.domain.usecase.model.DefaultApiError
 import net.sfelabs.knox.core.domain.usecase.executor.UseCaseBuilder
 import net.sfelabs.knox.core.domain.usecase.executor.UseCaseBuilder.UseCaseBuilderState
+import net.sfelabs.knox.core.domain.usecase.executor.assertAllSuccessful
 import net.sfelabs.knox.core.domain.usecase.MainCoroutineRule
 import org.junit.Before
 import org.junit.Rule
@@ -361,28 +362,54 @@ class UseCaseBuilderTest {
     }
 
     @Test
-    fun `timeout cancels execution`() = runTest {
-        val testDispatcher = StandardTestDispatcher(testScheduler)
-
+    fun `timeout returns completed results plus trailing TimeoutError`() = runTest {
         // Given
         val results = mutableListOf<Int>()
 
-        // When
-        builder.sequential {
+        // When: the single operation delays past the timeout, so it never completes.
+        val apiResults = builder.sequential {
             results.add(1)
             delay(100)
             ApiResult.Success(1)
         }
             .withTimeout(50.milliseconds)
-            .withScope(CoroutineScope(testDispatcher))
+            .withDispatcher(StandardTestDispatcher(testScheduler))
             .execute()
-            .also { apiResults ->
-                advanceTimeBy(51)
-                println("Results size: ${results.size}")
-                println("API Results: $apiResults")
-                assertTrue(apiResults.isEmpty())
-                assertEquals(1, results.size)
+
+        // Then: no completed operation result, plus a trailing timeout error.
+        assertEquals(1, apiResults.size)
+        assertTrue(apiResults.last() is ApiResult.Error)
+        assertTrue(
+            (apiResults.last() as ApiResult.Error).apiError is DefaultApiError.TimeoutError
+        )
+        // The side effect before the delay ran, but the operation never produced a result.
+        assertEquals(1, results.size)
+        // An all-success check now correctly reports failure.
+        assertFalse(apiResults.assertAllSuccessful())
+    }
+
+    @Test
+    fun `timeout preserves already completed results before the trailing TimeoutError`() = runTest {
+        // Given: first operation completes, second overruns the timeout.
+        val apiResults = builder.sequential {
+            ApiResult.Success("first")
+        }
+            .add {
+                delay(1_000)
+                ApiResult.Success("second")
             }
+            .withTimeout(50.milliseconds)
+            .withDispatcher(StandardTestDispatcher(testScheduler))
+            .execute()
+
+        // Then: the completed first result is preserved, then the timeout error is appended.
+        assertEquals(2, apiResults.size)
+        assertTrue(apiResults[0] is ApiResult.Success)
+        assertEquals("first", (apiResults[0] as ApiResult.Success).data)
+        assertTrue(apiResults[1] is ApiResult.Error)
+        assertTrue(
+            (apiResults[1] as ApiResult.Error).apiError is DefaultApiError.TimeoutError
+        )
     }
 
     @Test
@@ -459,6 +486,188 @@ class UseCaseBuilderTest {
             }
             .execute()
 
+        assertEquals(1, apiResults.size)
+        assertTrue(apiResults[0] is ApiResult.NotSupported)
+    }
+
+    @Test
+    fun `execute throws IllegalStateException when the builder is reused`() = runTest {
+        val configured = builder.sequential { ApiResult.Success(1) }
+        configured.execute()
+
+        try {
+            configured.execute()
+            fail("Expected IllegalStateException on second execute()")
+        } catch (e: IllegalStateException) {
+            assertTrue(
+                "Message should tell the developer to create a new builder",
+                e.message!!.contains("already been executed")
+            )
+        }
+    }
+
+    @Test
+    fun `predicate that throws is recorded as a mapped error result`() = runTest {
+        // Given
+        val apiResults = builder.sequential { ApiResult.Success(1) }
+            .add { ApiResult.Success(2) }
+            .`when` { throw IllegalStateException("predicate boom") }
+            .execute()
+
+        // Then: op1 succeeds, op2's throwing predicate becomes a mapped UnexpectedError.
+        assertEquals(2, apiResults.size)
+        assertTrue(apiResults[0] is ApiResult.Success)
+        assertTrue(apiResults[1] is ApiResult.Error)
+        assertTrue(
+            (apiResults[1] as ApiResult.Error).apiError is DefaultApiError.UnexpectedError
+        )
+    }
+
+    @Test
+    fun `fallback that throws is recorded as a mapped error result`() = runTest {
+        // Given
+        val apiResults = builder.sequential {
+            ApiResult.Error(DefaultApiError.UnexpectedError())
+        }
+            .withFallback { throw IllegalStateException("fallback boom") }
+            .execute()
+
+        // Then: the thrown fallback exception is mapped, not propagated.
+        assertEquals(1, apiResults.size)
+        assertTrue(apiResults[0] is ApiResult.Error)
+        assertTrue(
+            (apiResults[0] as ApiResult.Error).apiError is DefaultApiError.UnexpectedError
+        )
+    }
+
+    @Test
+    fun `NoSuchMethodError inside an operation surfaces as NotSupported`() = runTest {
+        // Given: mirrors an absent Knox API on the current device.
+        val apiResults = builder.sequential {
+            throw NoSuchMethodError("Knox API not present on this build")
+        }.execute()
+
+        // Then: mapped identically to SuspendingUseCase - NotSupported.
+        assertEquals(1, apiResults.size)
+        assertTrue(apiResults[0] is ApiResult.NotSupported)
+    }
+
+    @Test
+    fun `throwing errorHandler does not alter the operation outcome`() = runTest {
+        // Given: the errorHandler throws, but the recorded result must remain the original error.
+        val apiResults = builder.sequential {
+            ApiResult.Error(DefaultApiError.InvalidInput("bad input"))
+        }
+            .onError { throw IllegalStateException("handler boom") }
+            .execute()
+
+        // Then
+        assertEquals(1, apiResults.size)
+        assertTrue(apiResults[0] is ApiResult.Error)
+        assertTrue(
+            (apiResults[0] as ApiResult.Error).apiError is DefaultApiError.InvalidInput
+        )
+    }
+
+    @Test
+    fun `labels are carried into executed operations including the fallback label`() = runTest {
+        // Given
+        val states = mutableListOf<UseCaseBuilderState>()
+
+        // When
+        builder.sequential(label = "Load Config") { ApiResult.Success(1) }
+            .onStateChanged { states.add(it) }
+            .add(label = "Apply Policy") { ApiResult.Error(DefaultApiError.UnexpectedError()) }
+            .withFallback { ApiResult.Success(2) }
+            .execute()
+
+        // Then
+        val labels = states.last().executedOperations.map { it.label }
+        assertTrue("Expected primary label", labels.contains("Load Config"))
+        assertTrue("Expected failing op label", labels.contains("Apply Policy"))
+        assertTrue("Expected fallback label", labels.contains("Apply Policy (fallback)"))
+    }
+
+    @Test
+    fun `withDispatcher StandardTestDispatcher runs deterministically under runTest`() = runTest {
+        // Given: delayed operations whose virtual time is driven by runTest's scheduler.
+        val order = mutableListOf<String>()
+
+        // When
+        val apiResults = builder.sequential {
+            delay(200)
+            order.add("first")
+            ApiResult.Success("first")
+        }
+            .add {
+                delay(100)
+                order.add("second")
+                ApiResult.Success("second")
+            }
+            .withDispatcher(StandardTestDispatcher(testScheduler))
+            .execute()
+
+        // Then: execution is controlled by runTest (no foreign Job re-parenting) and ordered.
+        assertEquals(listOf("first", "second"), order)
+        assertEquals(2, apiResults.size)
+        assertTrue(apiResults.assertAllSuccessful())
+    }
+
+    @Test
+    fun `failed parallel group stops the chain`() = runTest {
+        // Given: run on the test dispatcher so the shared list is touched single-threaded.
+        val ran = mutableListOf<String>()
+
+        // When
+        val apiResults = builder.parallel {
+            ran.add("p1")
+            ApiResult.Success(1)
+        }
+            .add {
+                ran.add("p2")
+                ApiResult.Error(DefaultApiError.UnexpectedError())
+            }
+            .then()
+            .add {
+                ran.add("after")
+                ApiResult.Success("after")
+            }
+            .withDispatcher(StandardTestDispatcher(testScheduler))
+            .execute()
+
+        // Then: both parallel operations ran (no intra-group fail-fast), but the parallel
+        // failure stopped the chain, so the following sequential operation never ran.
+        assertTrue(ran.contains("p1"))
+        assertTrue(ran.contains("p2"))
+        assertFalse(ran.contains("after"))
+        assertEquals(2, apiResults.size)
+    }
+
+    @Test
+    fun `withRetry rejects non-positive maxAttempts at configuration time`() = runTest {
+        try {
+            builder.sequential { ApiResult.Success(1) }.withRetry(maxAttempts = 0)
+            fail("Expected IllegalArgumentException")
+        } catch (expected: IllegalArgumentException) {
+            // configuration error surfaces at the withRetry call, not inside execute()
+        }
+    }
+
+    @Test
+    fun `retry does not re-attempt an absent API`() = runTest {
+        // Given
+        var attempts = 0
+
+        // When
+        val apiResults = builder.sequential {
+            attempts++
+            throw NoSuchMethodError("api absent from this SDK build")
+        }
+            .withRetry(maxAttempts = 3)
+            .execute()
+
+        // Then: NotSupported is final - retrying cannot make the API appear.
+        assertEquals(1, attempts)
         assertEquals(1, apiResults.size)
         assertTrue(apiResults[0] is ApiResult.NotSupported)
     }

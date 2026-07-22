@@ -1,14 +1,17 @@
 package net.sfelabs.knox.core.domain.usecase
 
+import junit.framework.TestCase.assertEquals
 import junit.framework.TestCase.assertFalse
 import junit.framework.TestCase.assertTrue
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.runTest
 import net.sfelabs.knox.core.domain.usecase.executor.assertAllFailed
 import net.sfelabs.knox.core.domain.usecase.executor.assertAllSuccessful
 import net.sfelabs.knox.core.domain.usecase.executor.assertAnyFailed
 import net.sfelabs.knox.core.domain.usecase.executor.assertAnySuccessful
 import net.sfelabs.knox.core.domain.usecase.executor.assertNoneSuccessful
 import net.sfelabs.knox.core.domain.usecase.executor.assertNotSupported
+import net.sfelabs.knox.core.domain.usecase.executor.parallelResults
 import net.sfelabs.knox.core.domain.usecase.model.ApiResult
 import net.sfelabs.knox.core.domain.usecase.model.DefaultApiError
 import org.junit.Test
@@ -165,5 +168,111 @@ class UseCaseExtensionsTest {
         assertFalse(results.assertAllFailed())
         assertFalse(results.assertAnyFailed())
         assertFalse(results.assertNotSupported())
+    }
+
+    @Test
+    fun `parallelResults combines both values when both succeed`() = runTest {
+        val result = parallelResults(
+            first = { ApiResult.Success(2) },
+            second = { ApiResult.Success("x") }
+        ) { a, b -> "$b$a" }
+
+        assertTrue(result is ApiResult.Success)
+        assertEquals("x2", (result as ApiResult.Success).data)
+    }
+
+    @Test
+    fun `parallelResults returns the first error in declaration order`() = runTest {
+        val firstError = DefaultApiError.InvalidInput("first failed")
+        val secondError = DefaultApiError.PermissionError("second failed")
+
+        val result = parallelResults(
+            first = { ApiResult.Error(firstError) },
+            second = { ApiResult.Error(secondError) }
+        ) { a: Int, b: Int -> a + b }
+
+        assertTrue(result is ApiResult.Error)
+        // First non-success in declaration order wins, with its apiError intact.
+        assertEquals(firstError, (result as ApiResult.Error).apiError)
+    }
+
+    @Test
+    fun `parallelResults propagates error from the second operation when the first succeeds`() = runTest {
+        val secondError = DefaultApiError.PermissionError("second failed")
+
+        val result = parallelResults(
+            first = { ApiResult.Success(1) },
+            second = { ApiResult.Error(secondError) }
+        ) { a: Int, b: Int -> a + b }
+
+        assertTrue(result is ApiResult.Error)
+        assertEquals(secondError, (result as ApiResult.Error).apiError)
+    }
+
+    @Test
+    fun `parallelResults propagates NotSupported`() = runTest {
+        val result = parallelResults(
+            first = { ApiResult.Success(1) },
+            second = { ApiResult.NotSupported }
+        ) { a: Int, b: Int -> a + b }
+
+        assertTrue(result is ApiResult.NotSupported)
+    }
+
+    @Test
+    fun `parallelResults returns NotSupported before a later error in declaration order`() = runTest {
+        val result = parallelResults(
+            first = { ApiResult.NotSupported },
+            second = { ApiResult.Error(DefaultApiError.UnexpectedError()) }
+        ) { a: Int, b: Int -> a + b }
+
+        // First operation's NotSupported takes precedence over the second's error.
+        assertTrue(result is ApiResult.NotSupported)
+    }
+
+    @Test
+    fun `parallelResults arity-3 combines all three values when all succeed`() = runTest {
+        val result = parallelResults(
+            first = { ApiResult.Success(1) },
+            second = { ApiResult.Success(2) },
+            third = { ApiResult.Success(3) }
+        ) { a, b, c -> a + b + c }
+
+        assertTrue(result is ApiResult.Success)
+        assertEquals(6, (result as ApiResult.Success).data)
+    }
+
+    @Test
+    fun `parallelResults maps a thrown NoSuchMethodError to NotSupported`() = runTest {
+        val result = parallelResults<Int, Int, Int>(
+            first = { throw NoSuchMethodError("api absent from this SDK build") },
+            second = { ApiResult.Success(2) }
+        ) { a, b -> a + b }
+
+        // A thrown absent-API error must surface as NotSupported, not escape raw.
+        assertTrue(result is ApiResult.NotSupported)
+    }
+
+    @Test
+    fun `parallelResults returns first declared failure even when the sibling throws`() = runTest {
+        val result = parallelResults<Int, Int, Int>(
+            first = { ApiResult.Error(DefaultApiError.InvalidInput("bad input")) },
+            second = { throw IllegalStateException("boom") }
+        ) { a, b -> a + b }
+
+        // Declaration order wins: first's typed Error, not second's mapped exception.
+        assertTrue(result is ApiResult.Error)
+        assertTrue((result as ApiResult.Error).apiError is DefaultApiError.InvalidInput)
+    }
+
+    @Test
+    fun `parallelResults maps a throwing transform instead of escaping raw`() = runTest {
+        val result = parallelResults(
+            first = { ApiResult.Success(1) },
+            second = { ApiResult.Success(2) }
+        ) { _: Int, _: Int -> throw IllegalStateException("transform failed") }
+
+        assertTrue(result is ApiResult.Error)
+        assertTrue((result as ApiResult.Error).apiError is DefaultApiError.UnexpectedError)
     }
 }

@@ -1,5 +1,6 @@
 package net.sfelabs.knox.core.domain.usecase.executor
 
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
@@ -10,173 +11,101 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import net.sfelabs.knox.core.domain.usecase.base.mapThrowableToApiResult
 import net.sfelabs.knox.core.domain.usecase.model.ApiResult
 import net.sfelabs.knox.core.domain.usecase.model.DefaultApiError
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.coroutines.ContinuationInterceptor
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * A builder for composing and executing use case operations with various execution patterns and control mechanisms.
- * This builder provides a fluent API for defining complex execution flows with support for sequential,
- * parallel, and conditional execution patterns.
+ * A DSL for enforcing a **dynamic, runtime-determined set of policy operations** — the shape an
+ * MDM (or any policy-driven consumer) needs when it must run *many* [SuspendingUseCase] classes to
+ * apply a compliance profile, with per-operation retry, fallback, and live progress reporting.
  *
- * The builder is compatible with all UseCase implementations:
- * - [UseCase] interface implementations
- * - [BaseUseCase] implementations (synchronous with error mapping)
- * - [SuspendingUseCase] implementations (asynchronous with coroutine context switching)
+ * The heterogeneous `List<ApiResult<*>>` return is intentional: the operation list is not known at
+ * compile time, so results come back as a flat, order-preserving list you inspect afterwards
+ * (see [assertAllSuccessful] and friends). For a **fixed, small** combination of use cases whose
+ * types you know, prefer the typed combinators [parallelResults] instead — they return a single
+ * strongly-typed `ApiResult<R>`.
  *
- * Memory Management:
- * - All callbacks and references are automatically cleaned up after execution completes
- * - For Android, use lifecycle-aware scopes (viewModelScope, lifecycleScope) via [withScope]
- *   to ensure proper cancellation when the lifecycle owner is destroyed
- *
- * Coroutine Integration:
- * - Supports custom CoroutineScope via [withScope]
- * - Falls back to IO dispatcher scope if no scope provided
- * - Maintains proper coroutine hierarchy and cancellation
- *
- * State Management:
- * - Provides state change hooks via [onStateChanged]
- * - Tracks execution progress and results
- * - Reports operation success, failures, and skipped operations
- * - Automatic state cleanup after execution
- *
- * Key features:
- * - Sequential execution: Operations execute in order, stopping at first failure
- * - Parallel execution: Operations execute concurrently
- * - Any execution: Operations execute until first success
- * - Conditional execution using when/unless
- * - Retry policies with exponential backoff
- * - Timeout controls
- * - Error handling and fallbacks
- *
- * Android-Specific Considerations:
- * - All operations are executed on [Dispatchers.IO] by default to prevent main thread blocking
- * - No built-in lifecycle awareness - operations will continue even if the UI component is destroyed
- * - No automatic handling of configuration changes or process death
- * - Care should be taken with memory leaks when using error handlers or callbacks
- * - Long-running operation chains might need to consider battery optimization
- * - Parallel execution could potentially cause ANRs without proper timeout handling
- *
- * Threading Considerations:
- * - The builder executes its chain on [Dispatchers.IO] to prevent main thread blocking
- * - Coroutine dispatchers for individual operations should be specified in [SuspendingUseCase] implementations
- * - Parallel execution maintains proper coroutine scoping regardless of individual use case dispatchers
- *
- * Example with different UseCase types:
+ * ### Example: an MDM enforcing a policy set
  * ```
- * val builder = UseCaseBuilder()
- * val results = builder.sequential { baseUseCase() }
- *     .withScope(lifecycleScope)
+ * val results = UseCaseBuilder()
+ *     .parallel(label = "Disable Camera") { setCameraDisabledUseCase(true) }
+ *     .add(label = "Disable Bluetooth") { setBluetoothDisabledUseCase(true) }
+ *     .add(label = "Enforce Password") { enforcePasswordPolicyUseCase(profile) }
+ *         .withRetry(maxAttempts = 3)
+ *         .withFallback { queuePasswordPolicyUseCase(profile) }
+ *     .withTimeout(30.seconds)
  *     .onStateChanged { state ->
- *         // Track execution progress
- *         state.executedOperations.forEach { operation ->
- *             if (operation.skipped) {
- *                 // Handle skipped operation
- *             } else if (operation.wasSuccessful) {
- *                 // Handle successful operation
- *             }
+ *         // Live progress for a UI, e.g. "Disable Camera: applied"
+ *         state.executedOperations.forEach { op ->
+ *             report(op.label ?: op.id, if (op.wasSuccessful) "applied" else "failed")
  *         }
  *     }
- *     .add { suspendingUseCase("param") }
- *     .then()
- *     .parallel()
- *     .add { useCase1(42) }
- *     .add { useCase2("test") }
  *     .execute()
+ *
+ * if (results.assertAllSuccessful()) markCompliant() else markNonCompliant(results)
  * ```
  *
- * Example sequential execution:
- * ```
- * val results = builder.sequential { useCase1() }
- *     .add { useCase2() }
- *     .withRetry(maxAttempts = 3)
- *     .then()
- *     .add { useCase3() }
- *     .execute()
- * ```
+ * ### Grouping and chaining
+ * Operations are grouped and chained with [then] (sequential), [parallel], and [any]; [add] appends
+ * to the current group. Between groups the **chain** advances only while the preceding unit
+ * succeeds (see failure semantics).
  *
- * Example parallel execution with fallback:
- * ```
- * val results = builder.parallel { useCase1() }
- *     .add { useCase2() }
- *     .withFallback { fallbackUseCase() }
- *     .withTimeout(5.seconds)
- *     .execute()
- * ```
+ * ### Failure semantics (unified)
+ * An executed unit whose results contain a non-[ApiResult.Success] stops execution of *subsequent*
+ * units. Concretely:
+ * - **Sequential** groups stop at the first failure internally, and a failed sequential group stops
+ *   the chain.
+ * - **Parallel** groups always run *all* their own operations to completion (no intra-group
+ *   fail-fast), but a parallel group containing any non-success stops the chain.
+ * - **Any** groups stop internally at the first success; they stop the chain only if *every*
+ *   operation failed.
  *
- * Example conditional execution:
- * ```
- * val results = builder.sequential { useCase1() }
- *     .add { useCase2() }
- *     .`when` { shouldExecuteMore() }
- *     .then()
- *     .add { useCase3() }
- *     .execute()
- * ```
+ * ### Per-operation controls
+ * [`when`]/[unless] gate an operation on a predicate (skipped operations record an
+ * `ApiResult.Success(Unit)` and are marked `skipped`). [withFallback] runs a replacement when the
+ * main operation does not succeed. [onError] observes an [ApiResult.Error]; a **throwing**
+ * `errorHandler` is cancellation-checked and then suppressed — it never changes the outcome.
+ * [withRetry] retries failures with exponential backoff.
  *
- * Example mixed execution patterns:
- * ```
- * val results = builder.sequential { setupUseCase() }
- *     .then()
- *     .parallel()
- *     .add { parallelUseCase1() }
- *     .add { parallelUseCase2() }
- *     .then()
- *     .add { finalizeUseCase() }
- *     .execute()
- * ```
+ * ### ApiResult contract
+ * Every operation, predicate, fallback, and retry attempt is guarded: a thrown exception is mapped
+ * through the shared error mapping (identical to [SuspendingUseCase]), so `NoSuchMethodError`
+ * surfaces as [ApiResult.NotSupported] and `SecurityException` as a `PermissionError`. Nothing
+ * escapes `execute()` as a raw throwable except coroutine cancellation.
  *
- * WorkManager Integration:
- * The builder is designed to be compatible with WorkManager for background processing:
- * - Built-in support for threading through [Dispatchers.IO]
- * - Configurable timeout and retry policies
- * - State tracking for progress monitoring
- * - Results can be easily mapped to WorkManager.Result
+ * ### Dispatcher and lifecycle
+ * `execute()` runs on [withDispatcher] (default [Dispatchers.IO]). It never adopts a foreign [Job]:
+ * cancellation and lifecycle come from the coroutine that *calls* `execute()`. [withScope] is kept
+ * for source compatibility but only extracts the scope's dispatcher — bind the builder to a
+ * lifecycle by launching `execute()` inside that lifecycle's coroutine (e.g. `viewModelScope`).
  *
- * Example WorkManager integration:
- * ```
- * class UseCaseWorker(
- *     context: Context,
- *     params: WorkerParameters
- * ) : CoroutineWorker(context, params) {
+ * ### Timeout
+ * [withTimeout] bounds the chain at suspension points: a blocking SDK call that never suspends
+ * cannot be interrupted mid-call and will delay the return until it completes. On expiry,
+ * `execute()` returns a snapshot of the results completed so far plus a trailing
+ * `ApiResult.Error(TimeoutError)`, so all-success checks correctly report failure and partial
+ * progress remains visible. Note on ordering: the list returned by `execute()` is in declaration
+ * order, while progress states and the timeout partial snapshot list parallel results in
+ * *completion* order — correlate operations by `label`, not position.
  *
- *     override suspend fun doWork(): Result {
- *         val builder = UseCaseBuilder()
+ * ### Single use
+ * A builder is single-use: a second call to `execute()` throws [IllegalStateException]. Create a new
+ * [UseCaseBuilder] to run another chain.
  *
- *         return try {
- *             val results = builder.sequential { useCase1() }
- *                 .add { useCase2() }
- *                 .withTimeout(30.seconds)
- *                 .withRetry(maxAttempts = 3)
- *                 .execute()
- *
- *             if (results.all { it is ApiResult.Success }) {
- *                 Result.success()
- *             } else {
- *                 Result.failure()
- *             }
- *         } catch (e: Exception) {
- *             Result.failure()
- *         }
- *     }
- * }
- * ```
- *
- * All operations return [ApiResult] instances, and the builder maintains proper error
- * handling and cancellation support throughout the execution chain. Resources are automatically
- * cleaned up after execution completes.
- *
- * @see UseCase
- * @see BaseUseCase
  * @see SuspendingUseCase
  * @see ApiResult
+ * @see parallelResults
  */
-
 class UseCaseBuilder {
     internal sealed class ExecutionUnit {
         data class SingleOperation(
             val execute: suspend () -> ApiResult<*>,
+            val label: String? = null,
             val predicate: (suspend () -> Boolean)? = null,
             val fallback: (suspend () -> ApiResult<*>)? = null,
             val errorHandler: ((ApiResult.Error) -> Unit)? = null,
@@ -190,9 +119,9 @@ class UseCaseBuilder {
     }
 
     internal enum class GroupType {
-        SEQUENTIAL,    // All must succeed in order
-        PARALLEL,      // All executed together
-        ANY           // First success wins
+        SEQUENTIAL,    // Stops internally at first failure; failed group stops the chain
+        PARALLEL,      // Runs all operations; any failure stops the chain
+        ANY            // First success wins; stops the chain only if all failed
     }
 
     interface UseCaseBuilderState {
@@ -202,14 +131,16 @@ class UseCaseBuilder {
 
     data class ExecutedOperation(
         val id: String,
+        val label: String? = null,
         val timestamp: Long,
         val wasSuccessful: Boolean,
         val skipped: Boolean = false
     )
 
     class Builder {
-        private var coroutineScope: CoroutineScope? = null
-        private val executionUnits = mutableListOf<ExecutionUnit>()
+        private var dispatcher: CoroutineDispatcher? = null
+        private val executed = AtomicBoolean(false)
+        private val executionUnits = mutableListOf<ExecutionUnit.OperationGroup>()
         private var currentGroup = ExecutionUnit.OperationGroup()
         private var timeoutDuration: Duration? = null
         private var retryPolicy: RetryPolicy? = null
@@ -227,7 +158,11 @@ class UseCaseBuilder {
             val maxDelay: Duration = 500.milliseconds,
             val factor: Double = 2.0,
             val predicate: (ApiResult.Error) -> Boolean = { true }
-        )
+        ) {
+            init {
+                require(maxAttempts > 0) { "maxAttempts must be positive, was $maxAttempts" }
+            }
+        }
 
         fun onStateChanged(listener: (UseCaseBuilderState) -> Unit): Builder {
             stateListener = listener
@@ -248,9 +183,16 @@ class UseCaseBuilder {
             }
         }
 
-        fun add(operation: suspend () -> ApiResult<*>): Builder {
+        /**
+         * Appends an operation to the current group.
+         *
+         * @param label optional human-readable name surfaced in [ExecutedOperation.label] for
+         *   progress reporting (e.g. an MDM showing "Disable Camera: applied").
+         * @param operation the use-case invocation returning an [ApiResult].
+         */
+        fun add(label: String? = null, operation: suspend () -> ApiResult<*>): Builder {
             currentGroup.operations.add(
-                ExecutionUnit.SingleOperation(operation)
+                ExecutionUnit.SingleOperation(execute = operation, label = label)
             )
             return this
         }
@@ -323,23 +265,49 @@ class UseCaseBuilder {
             return this
         }
 
+        /**
+         * Runs `execute()` on the given [dispatcher] (default [Dispatchers.IO]). Preferred over
+         * [withScope]: lifecycle/cancellation come from the coroutine that calls `execute()`, not
+         * from a foreign scope's [kotlinx.coroutines.Job].
+         */
+        fun withDispatcher(dispatcher: CoroutineDispatcher): Builder {
+            this.dispatcher = dispatcher
+            return this
+        }
+
+        /**
+         * Kept for source compatibility. Only the scope's [CoroutineDispatcher] is extracted; the
+         * scope's [kotlinx.coroutines.Job] is deliberately **not** adopted. To bind execution to a
+         * lifecycle, launch `execute()` inside that lifecycle's coroutine instead.
+         */
         fun withScope(scope: CoroutineScope): Builder {
-            coroutineScope = scope
+            this.dispatcher = scope.coroutineContext[ContinuationInterceptor] as? CoroutineDispatcher
             return this
         }
 
         suspend fun execute(): List<ApiResult<*>> {
+            check(executed.compareAndSet(false, true)) {
+                "This UseCaseBuilder has already been executed. Create a new UseCaseBuilder to run another chain."
+            }
+
             if (currentGroup.operations.isNotEmpty()) {
                 executionUnits.add(currentGroup)
             }
 
-            val scope = coroutineScope ?: CoroutineScope(Dispatchers.IO)
+            val resolvedDispatcher = dispatcher ?: Dispatchers.IO
 
-            return withContext(scope.coroutineContext) {  // Use the provided scope's context
+            return withContext(resolvedDispatcher) {
                 try {
                     withTimeoutOrNull(timeoutDuration?.inWholeMilliseconds ?: Long.MAX_VALUE) {
                         executeOperations()
-                    } ?: emptyList()
+                    } ?: run {
+                        // On timeout: return what completed plus a trailing TimeoutError so
+                        // all-success checks fail and partial progress stays visible.
+                        val completed = synchronized(stateLock) { results.toList() }
+                        completed + ApiResult.Error(
+                            DefaultApiError.TimeoutError("Execution timed out after $timeoutDuration")
+                        )
+                    }
                 } finally {
                     cleanup()
                 }
@@ -357,6 +325,7 @@ class UseCaseBuilder {
                     results.add(result)
                     executedOperations.add(ExecutedOperation(
                         id = operation.hashCode().toString(),
+                        label = operation.label,
                         timestamp = System.currentTimeMillis(),
                         wasSuccessful = result is ApiResult.Success,
                         skipped = skipped
@@ -367,28 +336,53 @@ class UseCaseBuilder {
                 return index
             }
 
-            // Check predicate if exists
-            if (operation.predicate?.invoke() == false) {
-                val result = ApiResult.Success(Unit)
-                recordResult(result, skipped = true)
-                return result
+            // Check predicate if it exists. A throwing predicate is cancellation-checked and then
+            // recorded as a mapped error result (the ApiResult contract must hold).
+            val predicate = operation.predicate
+            if (predicate != null) {
+                val shouldExecute = try {
+                    predicate()
+                } catch (e: Throwable) {
+                    currentCoroutineContext().ensureActive()
+                    val mapped = mapThrowableToApiResult<Any>(e)
+                    recordResult(mapped, skipped = false)
+                    return mapped
+                }
+                if (!shouldExecute) {
+                    val result = ApiResult.Success(Unit)
+                    recordResult(result, skipped = true)
+                    return result
+                }
             }
 
             val result = executeWithRetry(operation)
             val resultIndex = recordResult(result, skipped = false)
 
-            // Handle errors if handler exists
+            // Observe errors if a handler exists. A throwing errorHandler is cancellation-checked
+            // and then suppressed: side effects must never alter the operation outcome.
             if (result is ApiResult.Error) {
-                operation.errorHandler?.invoke(result)
+                try {
+                    operation.errorHandler?.invoke(result)
+                } catch (e: Throwable) {
+                    currentCoroutineContext().ensureActive()
+                    // Suppressed intentionally.
+                }
             }
 
-            // Try fallback if main operation failed
+            // Try fallback if the main operation did not succeed. A throwing fallback is
+            // cancellation-checked and then recorded as a mapped error result.
             return when {
                 result !is ApiResult.Success && operation.fallback != null -> {
-                    val fallbackResult = operation.fallback.invoke()
+                    val fallbackResult = try {
+                        operation.fallback.invoke()
+                    } catch (e: Throwable) {
+                        currentCoroutineContext().ensureActive()
+                        mapThrowableToApiResult<Any>(e)
+                    }
                     synchronized(stateLock) {
                         executedOperations.add(ExecutedOperation(
                             id = "${operation.hashCode()}_fallback",
+                            label = operation.label?.let { "$it (fallback)" },
                             timestamp = System.currentTimeMillis(),
                             wasSuccessful = fallbackResult is ApiResult.Success,
                             skipped = false
@@ -409,7 +403,7 @@ class UseCaseBuilder {
                 operation.execute()
             } catch (e: Throwable) {
                 currentCoroutineContext().ensureActive()
-                ApiResult.Error(DefaultApiError.UnexpectedError(), Exception(e))
+                mapThrowableToApiResult<Any>(e)
             }
 
             var currentDelay = policy.initialDelay
@@ -430,8 +424,10 @@ class UseCaseBuilder {
                     }
                 } catch (e: Throwable) {
                     currentCoroutineContext().ensureActive()
-                    if (attempt == policy.maxAttempts - 1) {
-                        return ApiResult.Error(DefaultApiError.UnexpectedError(), Exception(e))
+                    val mapped = mapThrowableToApiResult<Any>(e)
+                    // An absent API will not appear on a later attempt - surface NotSupported now.
+                    if (mapped is ApiResult.NotSupported || attempt == policy.maxAttempts - 1) {
+                        return mapped
                     }
                     delay(currentDelay.inWholeMilliseconds)
                     currentDelay = (currentDelay.inWholeMilliseconds * policy.factor)
@@ -439,7 +435,7 @@ class UseCaseBuilder {
                         .coerceAtMost(policy.maxDelay)
                 }
             }
-            throw IllegalStateException("Unexpected state in executeWithRetry")
+            error("unreachable: the final retry attempt always returns")
         }
 
         private suspend fun executeSequential(
@@ -456,6 +452,7 @@ class UseCaseBuilder {
         private suspend fun executeParallel(
             operations: List<ExecutionUnit.SingleOperation>
         ): List<ApiResult<*>> = coroutineScope {
+            // No intra-group fail-fast: every operation runs to completion.
             val results = operations.map { operation ->
                 async { executeSingleOperation(operation) }
             }.awaitAll()
@@ -483,48 +480,45 @@ class UseCaseBuilder {
         private suspend fun executeOperations(): List<ApiResult<*>> {
             val results = mutableListOf<ApiResult<*>>()
 
-            for (unit in executionUnits) {
-                when (unit) {
-                    is ExecutionUnit.SingleOperation -> {
-                        results.add(executeSingleOperation(unit))
-                        if (results.last() !is ApiResult.Success) break
-                    }
-                    is ExecutionUnit.OperationGroup -> {
-                        val groupResults = when (unit.type) {
-                            GroupType.SEQUENTIAL -> executeSequential(unit.operations)
-                            GroupType.PARALLEL -> executeParallel(unit.operations)
-                            GroupType.ANY -> executeAny(unit.operations)
-                        }
-                        results.addAll(groupResults)
-
-                        if (unit.type == GroupType.SEQUENTIAL &&
-                            groupResults.any { it !is ApiResult.Success }) {
-                            break
-                        }
-                    }
+            for (group in executionUnits) {
+                val groupResults = when (group.type) {
+                    GroupType.SEQUENTIAL -> executeSequential(group.operations)
+                    GroupType.PARALLEL -> executeParallel(group.operations)
+                    GroupType.ANY -> executeAny(group.operations)
                 }
+                results.addAll(groupResults)
+
+                // Unified chain-stop: a non-success stops subsequent units. ANY groups are
+                // the exception - they only stop the chain when every operation failed.
+                val stopChain = when (group.type) {
+                    GroupType.ANY -> groupResults.none { it is ApiResult.Success }
+                    else -> groupResults.any { it !is ApiResult.Success }
+                }
+                if (stopChain) break
             }
 
             return results
         }
 
         private fun cleanup() {
-            executedOperations.clear()
-            results.clear()
+            synchronized(stateLock) {
+                executedOperations.clear()
+                results.clear()
+            }
             stateListener = null
-            coroutineScope = null
+            dispatcher = null
         }
     }
 
-    fun sequential(operation: suspend () -> ApiResult<*>): Builder {
-        return Builder().add(operation)
+    fun sequential(label: String? = null, operation: suspend () -> ApiResult<*>): Builder {
+        return Builder().add(label, operation)
     }
 
-    fun parallel(operation: suspend () -> ApiResult<*>): Builder {
-        return Builder().parallel().add(operation)
+    fun parallel(label: String? = null, operation: suspend () -> ApiResult<*>): Builder {
+        return Builder().parallel().add(label, operation)
     }
 
-    fun any(operation: suspend () -> ApiResult<*>): Builder {
-        return Builder().any().add(operation)
+    fun any(label: String? = null, operation: suspend () -> ApiResult<*>): Builder {
+        return Builder().any().add(label, operation)
     }
 }
