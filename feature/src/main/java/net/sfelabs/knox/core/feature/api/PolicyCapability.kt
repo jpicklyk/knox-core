@@ -9,7 +9,7 @@ package net.sfelabs.knox.core.feature.api
  * Capabilities describe device/Android concepts (what the policy modifies),
  * device requirements (what hardware is needed), and impact characteristics.
  *
- * **Note:** SDK requirements (Knox Tactical vs Knox Enterprise) are NOT capabilities.
+ * **Note:** SDK requirements are NOT capabilities.
  * They are implicit based on which module contains the policy. This keeps knox-core
  * SDK-agnostic while allowing powerful capability-based filtering and grouping.
  *

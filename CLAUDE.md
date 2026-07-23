@@ -8,7 +8,7 @@ knox-core is the foundational library for Knox SDK modules. It provides DI-agnos
 
 ## Build Commands
 
-Run from the parent project root (`knoxmoduleshowcase/`):
+Run from the project root:
 
 - **Build knox-core**: `./gradlew :knox-core:build` or build individual submodules like `:knox-core:feature:build`
 - **Run unit tests**: `./gradlew :knox-core:test` or `:knox-core:common:test`

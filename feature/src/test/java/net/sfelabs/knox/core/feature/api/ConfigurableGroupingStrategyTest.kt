@@ -86,13 +86,13 @@ class ConfigurableGroupingStrategyTest {
                 PolicyGroup("advanced", "Advanced")
             ),
             policyAssignments = mapOf(
-                "tactical_mode" to "quick",
+                "device_lock_mode" to "quick",
                 "band_locking" to "advanced"
             )
         )
         val strategy = ConfigurableGroupingStrategy(config)
 
-        val component = createTestComponent("tactical_mode")
+        val component = createTestComponent("device_lock_mode")
         val group = strategy.getGroupForPolicy(component)
 
         assertEquals("quick", group?.id)
@@ -102,7 +102,7 @@ class ConfigurableGroupingStrategyTest {
     fun `getGroupForPolicy returns null for unassigned policy`() {
         val config = GroupingConfiguration(
             groups = listOf(PolicyGroup("quick", "Quick Access")),
-            policyAssignments = mapOf("tactical_mode" to "quick")
+            policyAssignments = mapOf("device_lock_mode" to "quick")
         )
         val strategy = ConfigurableGroupingStrategy(config)
 
@@ -116,11 +116,11 @@ class ConfigurableGroupingStrategyTest {
     fun `getGroupForPolicy returns null when assigned to non-existent group`() {
         val config = GroupingConfiguration(
             groups = listOf(PolicyGroup("quick", "Quick Access")),
-            policyAssignments = mapOf("tactical_mode" to "nonexistent")
+            policyAssignments = mapOf("device_lock_mode" to "nonexistent")
         )
         val strategy = ConfigurableGroupingStrategy(config)
 
-        val component = createTestComponent("tactical_mode")
+        val component = createTestComponent("device_lock_mode")
         val group = strategy.getGroupForPolicy(component)
 
         assertNull(group)
@@ -134,26 +134,26 @@ class ConfigurableGroupingStrategyTest {
                 PolicyGroup("advanced", "Advanced")
             ),
             policyAssignments = mapOf(
-                "tactical_mode" to "quick",
+                "device_lock_mode" to "quick",
                 "night_vision" to "quick",
                 "band_locking" to "advanced"
             )
         )
         val strategy = ConfigurableGroupingStrategy(config)
 
-        val tacticalMode = createTestComponent("tactical_mode")
+        val deviceLockMode = createTestComponent("device_lock_mode")
         val nightVision = createTestComponent("night_vision")
         val bandLocking = createTestComponent("band_locking")
         val unassigned = createTestComponent("unassigned")
 
         every { mockRegistry.getAllComponents() } returns listOf(
-            tacticalMode, nightVision, bandLocking, unassigned
+            deviceLockMode, nightVision, bandLocking, unassigned
         )
 
         val quickPolicies = strategy.getPoliciesInGroup("quick", mockRegistry)
 
         assertEquals(2, quickPolicies.size)
-        assertTrue(quickPolicies.any { it.policyName == "tactical_mode" })
+        assertTrue(quickPolicies.any { it.policyName == "device_lock_mode" })
         assertTrue(quickPolicies.any { it.policyName == "night_vision" })
     }
 
@@ -161,7 +161,7 @@ class ConfigurableGroupingStrategyTest {
     fun `getPoliciesInGroup returns empty list for unknown group`() {
         val config = GroupingConfiguration(
             groups = listOf(PolicyGroup("quick", "Quick Access")),
-            policyAssignments = mapOf("tactical_mode" to "quick")
+            policyAssignments = mapOf("device_lock_mode" to "quick")
         )
         val strategy = ConfigurableGroupingStrategy(config)
 
@@ -179,12 +179,12 @@ class ConfigurableGroupingStrategyTest {
                 PolicyGroup("quick", "Quick Access"),
                 PolicyGroup("empty", "Empty Group")
             ),
-            policyAssignments = mapOf("tactical_mode" to "quick")
+            policyAssignments = mapOf("device_lock_mode" to "quick")
         )
         val strategy = ConfigurableGroupingStrategy(config)
 
-        val tacticalMode = createTestComponent("tactical_mode")
-        every { mockRegistry.getAllComponents() } returns listOf(tacticalMode)
+        val deviceLockMode = createTestComponent("device_lock_mode")
+        every { mockRegistry.getAllComponents() } returns listOf(deviceLockMode)
 
         val policies = strategy.getPoliciesInGroup("empty", mockRegistry)
 
@@ -199,15 +199,15 @@ class ConfigurableGroupingStrategyTest {
                 PolicyGroup("advanced", "Advanced", sortOrder = 2)
             ),
             policyAssignments = mapOf(
-                "tactical_mode" to "quick",
+                "device_lock_mode" to "quick",
                 "band_locking" to "advanced"
             )
         )
         val strategy = ConfigurableGroupingStrategy(config)
 
-        val tacticalMode = createTestComponent("tactical_mode")
+        val deviceLockMode = createTestComponent("device_lock_mode")
         val bandLocking = createTestComponent("band_locking")
-        every { mockRegistry.getAllComponents() } returns listOf(tacticalMode, bandLocking)
+        every { mockRegistry.getAllComponents() } returns listOf(deviceLockMode, bandLocking)
 
         val resolvedGroups = strategy.resolveAllGroups(mockRegistry)
 
@@ -215,7 +215,7 @@ class ConfigurableGroupingStrategyTest {
 
         val quickGroup = resolvedGroups.find { it.group.id == "quick" }
         assertEquals(1, quickGroup?.policies?.size)
-        assertEquals("tactical_mode", quickGroup?.policies?.get(0)?.policyName)
+        assertEquals("device_lock_mode", quickGroup?.policies?.get(0)?.policyName)
 
         val advancedGroup = resolvedGroups.find { it.group.id == "advanced" }
         assertEquals(1, advancedGroup?.policies?.size)
@@ -229,12 +229,12 @@ class ConfigurableGroupingStrategyTest {
         val config = GroupingConfiguration.builder()
             .addGroup("quick", "Quick Access", sortOrder = 1)
             .addGroup("advanced", "Advanced", sortOrder = 2)
-            .assignPolicy("tactical_mode", "quick")
+            .assignPolicy("device_lock_mode", "quick")
             .assignPolicy("band_locking", "advanced")
             .build()
 
         assertEquals(2, config.groups.size)
-        assertEquals("quick", config.policyAssignments["tactical_mode"])
+        assertEquals("quick", config.policyAssignments["device_lock_mode"])
         assertEquals("advanced", config.policyAssignments["band_locking"])
     }
 

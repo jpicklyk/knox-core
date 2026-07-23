@@ -17,8 +17,8 @@ import net.sfelabs.knox.core.feature.domain.registry.PolicyRegistry
  *         PolicyGroup("advanced", "Advanced", sortOrder = 2)
  *     ),
  *     policyAssignments = mapOf(
- *         "tactical_device_mode" to "quick",
- *         "enable_night_vision_mode" to "quick",
+ *         "device_lock_mode" to "quick",
+ *         "screen_brightness" to "quick",
  *         "band_locking_5g" to "advanced",
  *         "enable_hdm" to "advanced"
  *     )
