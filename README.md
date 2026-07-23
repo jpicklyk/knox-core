@@ -39,7 +39,7 @@ Shared utilities and domain logic:
 - **Data** - `DataStoreSource` and `DefaultDataStoreSource` for preferences storage
 - **Domain** - `PreferencesRepository` and utility functions for Knox HDM, netmask calculations, package management
 - **Presentation** - `ResourceProvider` for string resource access
-- **Result** - Generic `Result` type for operation outcomes
+- **Result** - `UnitApiCall` typealias (`ApiResult<Unit>`); the `ApiResult` result type itself lives in the `usecase-executor` submodule
 - **UiText** - Abstraction for UI text (string resources or dynamic text)
 
 #### DI-Agnostic Singleton Pattern
@@ -185,7 +185,7 @@ class GetBrightnessUseCase : SuspendingUseCase<Unit, Int>() {
             val brightness = // ... get brightness value
             ApiResult.Success(brightness)
         } catch (e: Exception) {
-            ApiResult.Error(DefaultApiError(e.message ?: "Unknown error"))
+            ApiResult.Error(DefaultApiError.UnexpectedError(e.message ?: "Unknown error"))
         }
     }
 }
@@ -194,28 +194,35 @@ class GetBrightnessUseCase : SuspendingUseCase<Unit, Int>() {
 val result = GetBrightnessUseCase().invoke(Unit)
 when (result) {
     is ApiResult.Success -> println("Brightness: ${result.data}")
-    is ApiResult.Error -> println("Error: ${result.error.message}")
+    is ApiResult.Error -> println("Error: ${result.apiError.message}")
 }
 ```
 
 ### Using the Policy Framework
 
 ```kotlin
-// Define a policy
+// Define a policy - KSP generates a Component, Key, and registry entry from the annotation
 @PolicyDefinition(
-    key = "screen_brightness",
-    category = PolicyCategory.DISPLAY
+    title = "Disable Volume Panel",
+    description = "When enabled, disables the system volume panel.",
+    category = PolicyCategory.Toggle,
+    capabilities = [PolicyCapability.MODIFIES_AUDIO]
 )
-class ScreenBrightnessPolicy : ConfigurableStatePolicy<Int> {
-    override suspend fun getState(): PolicyState<Int> { ... }
-    override suspend fun setState(value: Int): Result<Unit> { ... }
+class VolumePanelPolicy : BooleanStatePolicy(StateMapping.INVERTED) {
+    override suspend fun getEnabled(): ApiResult<Boolean> = GetVolumePanelEnabledStateUseCase()()
+    override suspend fun setEnabled(enabled: Boolean): ApiResult<Unit> = SetVolumePanelEnabledStateUseCase()(enabled)
 }
 
-// Register and access policies
+// Register the generated components and access policies through the registry
 val registry: PolicyRegistry = DefaultPolicyRegistry()
-registry.register(ScreenBrightnessPolicy())
+registry.components = GeneratedPolicyComponents.getAll().toSet()
 
-val policy = registry.getPolicy<ScreenBrightnessPolicy>("screen_brightness")
+val state = registry.getPolicyState("volume_panel")
+when (val result = registry.setAndRefreshPolicyState(VolumePanelPolicyKey, newState)) {
+    is ApiResult.Success -> updateUi(result.data)   // refreshed, device-derived state
+    is ApiResult.Error -> showError(result.apiError.message)
+    ApiResult.NotSupported -> markUnsupported()
+}
 ```
 
 ### Policy Capabilities
@@ -315,7 +322,7 @@ class PoliciesViewModel @Inject constructor(
 
 ```kotlin
 // Create a resource provider
-val resourceProvider = ResourceProviderFactory.create(context)
+val resourceProvider = DefaultResourceProviderFactory.create(context)
 
 // Access string resources
 val text = resourceProvider.getString(R.string.my_string)
