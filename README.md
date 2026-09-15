@@ -236,7 +236,7 @@ Operations that are performed rather than configured (reset, reboot, clear) exte
 ```kotlin
 @PolicyDefinition(
     title = "Reset All Settings",
-    description = "Resets every Knox custom setting to its default value.",
+    description = "Performs the device's Reset All Settings operation.",
     category = PolicyCategory.Action
 )
 class ResetAllSettingsPolicy : ActionPolicy() {
