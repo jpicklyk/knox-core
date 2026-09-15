@@ -61,7 +61,7 @@ The `setInstance()` method allows DI frameworks to register their managed single
 Policy framework for managing Knox policies:
 
 - **Policy API** - Interfaces for defining policies (`PolicyComponent`, `PolicyContract`, `PolicyDescriptor`)
-- **Policy State** - State management (`PolicyState`, `BooleanPolicyState`, `ConfigurableStatePolicy`)
+- **Policy State** - State management (`PolicyState`, `BooleanPolicyState`, `ConfigurableStatePolicy`, `ActionPolicy`)
 - **Policy Registry** - Registration and lookup with multi-dimensional indexing (`DefaultPolicyRegistry`, `CachedPolicyRegistry`)
 - **Policy Capabilities** - Device-centric metadata (`PolicyCapability`) for filtering and categorization
 - **Grouping Strategies** - Customer-extensible grouping (`PolicyGroupingStrategy`, `CapabilityBasedGroupingStrategy`)
@@ -222,6 +222,26 @@ when (val result = registry.setAndRefreshPolicyState(VolumePanelPolicyKey, newSt
     is ApiResult.Success -> updateUi(result.data)   // refreshed, device-derived state
     is ApiResult.Error -> showError(result.apiError.message)
     ApiResult.NotSupported -> markUnsupported()
+}
+```
+
+### One-Shot Actions
+
+Operations that are performed rather than configured (reset, reboot, clear) extend
+`ActionPolicy` with `PolicyCategory.Action`. There is nothing to read back from the device:
+`setState` runs the action, `getState` reports the outcome of the most recent run
+(`ActionPolicyState.lastRunSucceeded`), and support is only learned when a run returns
+`ApiResult.NotSupported`. The UI renders these as a button instead of a switch.
+
+```kotlin
+@PolicyDefinition(
+    title = "Reset All Settings",
+    description = "Resets every Knox custom setting to its default value.",
+    category = PolicyCategory.Action
+)
+class ResetAllSettingsPolicy : ActionPolicy() {
+    private val resetUseCase = ResetAllSettingsUseCase()
+    override suspend fun execute(): ApiResult<Unit> = resetUseCase()
 }
 ```
 
