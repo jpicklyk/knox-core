@@ -52,10 +52,12 @@ class CachedPolicyRegistry(private val delegate: DefaultPolicyRegistry) : Policy
     ): ApiResult<Unit> {
         return mutex.withLock {
             getHandler(policyKey)?.setState(state)?.also { result ->
-                if (result is ApiResult.Success) {
+                if (result is ApiResult.Success || result is ApiResult.NotSupported) {
                     // Invalidate cache entry so next getPolicyState fetches fresh from device.
                     // We cannot cache the input state because it may be missing device-derived
                     // fields (e.g., HdmState.supportedMask) that are only populated by getState().
+                    // NotSupported is new information too: the cached entry may still claim the
+                    // policy is supported (an ActionPolicy only learns this by running).
                     cache.remove(policyKey.policyName)
                 }
             } ?: ApiResult.Error(DefaultApiError.UnexpectedError("Policy handler not found"))
@@ -76,6 +78,9 @@ class CachedPolicyRegistry(private val delegate: DefaultPolicyRegistry) : Policy
             return@withLock ApiResult.Error(setResult.apiError, setResult.exception)
         }
         if (setResult is ApiResult.NotSupported) {
+            // Drop the cached entry so a subsequent getPolicyState re-reads the device and
+            // can report the policy as unsupported.
+            cache.remove(policyKey.policyName)
             return@withLock ApiResult.NotSupported
         }
 
